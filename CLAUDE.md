@@ -31,11 +31,37 @@ the bridge is allowed to exist at all: two methods, both taking two integers.
 - **Every dependency is justified in the README table.** Adding one means
   adding a row and defending it.
 - The package id is `dev.useclique.android` and is permanent once published.
-- **Verify by building.** `./gradlew assembleDebug` with `ANDROID_HOME=/opt/android-sdk`.
-  Never report a change as done without it.
+- **A green build is not a working feature.** `./gradlew assembleDebug` proves
+  it compiles and nothing more. The device is at
+  `agent-infra/deploy/android-emulator` (`android-emu start`, about a minute,
+  reaped after three hours). Two features shipped correct and dead this way:
+  a terminal that crashed on open, and an Approve button that could never
+  appear. Both took minutes to find on a device and had survived reading the
+  code twice.
 
-## The one thing between here and F-Droid
+## Signing and release
 
-The vendored xterm.js is minified, and F-Droid treats a minified bundle as a
-binary rather than source. It must be built from source in the build recipe
-before submission. See the README section.
+**One keystore, permanently.** Android ties an install to the key that signed
+it, so replacing `/root/.clique-android/release.keystore` means every existing
+install has to be removed by hand. It is backed up in Vaultwarden. A clone
+without it still builds, falling back to the debug key, which is why
+`tools/publish.py` checks the certificate before publishing anything.
+
+`python3 tools/publish.py` is the only way to release. It refuses a dirty tree
+and a `versionCode` that is not higher than what the repo serves, because
+Android silently never offers an update for an equal or lower one.
+`docs/releasing.md` and `docs/fdroid-repo.md`.
+
+## Answering a session that is asking must not attach to it
+
+Opening a session attaches a tmux client, the pane repaints, and the panel
+reads output-after-a-signal as the session having carried on, so it clears the
+signal in **under three seconds**. That is why Approve and Deny live on the
+notification rather than only on the session screen. Anything else that acts on
+a waiting session inherits this: do it without opening the session.
+
+## Where the work is written down
+
+`docs/port-plan.md` for what is left and what is deliberately refused. The
+**CLIque** board in Kaneo for what is in flight. The panel's own roadmap is
+`../clique/docs/next.md` and is a different list.
