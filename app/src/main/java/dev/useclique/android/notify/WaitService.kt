@@ -16,6 +16,7 @@ import dev.useclique.android.CliqueApp
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
 import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.api.Session
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -78,7 +79,28 @@ class WaitService : Service() {
                 val matched = result.optBoolean("matched")
                 val state = result.optString("state")
                 if (matched) {
-                    if (key != onScreen) notifyDone(name, state, serverId, sessionId)
+                    val session = if (state == "waiting") {
+                        try {
+                            client.state().sessions.firstOrNull { it.id == sessionId }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+                    when (waitNotice(state, session)) {
+                        WaitNotice.APPROVAL -> {
+                            // Permission prompts post even when this session is
+                            // on screen. onScreen suppression is for "finished";
+                            // the in-session banner is often already gone.
+                            if (session != null) {
+                                notifyPermission(name, session, serverId, sessionId)
+                            }
+                        }
+                        WaitNotice.FINISHED -> {
+                            if (key != onScreen) notifyDone(name, state, serverId, sessionId)
+                        }
+                    }
                     return
                 }
             }
@@ -91,6 +113,12 @@ class WaitService : Service() {
                 stopSelf()
             }
         }
+    }
+
+    private fun notifyPermission(name: String, session: Session, serverId: String, sessionId: String) {
+        val id = nextId()
+        val notif = permissionNotification(this, name, session.saying, serverId, sessionId, id)
+        getSystemService(NotificationManager::class.java).notify(id, notif)
     }
 
     private fun notifyDone(name: String, state: String, serverId: String, sessionId: String) {
@@ -145,6 +173,7 @@ class WaitService : Service() {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_DONE, getString(R.string.channel_wait), NotificationManager.IMPORTANCE_HIGH),
         )
+        ensurePermissionChannel(this)
     }
 
     private fun stopAll() {

@@ -41,5 +41,9 @@
             android:name=".notify.WaitService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".notify.PermissionActionReceiver"
+            android:exported="false" />
     </application>
 </manifest>

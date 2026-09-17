@@ -74,6 +74,9 @@
     <string name="create_failed">Could not create the session.</string>
     <string name="no_clis">No installed CLIs reported by this panel.</string>
     <string name="channel_wait">Session finished</string>
+    <string name="channel_permission">Needs approval</string>
+    <string name="notif_permission">%1$s wants your approval</string>
+    <string name="notif_action_failed">The reply did not go through</string>
     <string name="notif_waiting">%1$s is waiting for you</string>
     <string name="notif_idle">%1$s finished</string>
     <string name="notif_error">%1$s errored</string>
