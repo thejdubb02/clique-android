@@ -1,7 +1,28 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+/*
+  Release signing, from a file that is deliberately not in this repo.
+
+  Android ties an installed app to the key that signed it. Every release,
+  including the ones our own F-Droid repo serves, is signed by the keystore at
+  the path below, and that keystore is permanent: replacing it means every
+  existing install has to be removed and reinstalled by hand. It is backed up
+  in Vaultwarden.
+
+  A clone without that file still builds. It falls back to the debug key, which
+  is right for someone trying the thing out and wrong for anything published,
+  so `signedRelease` below is what the publish script checks.
+*/
+val signingProps = Properties().apply {
+    val f = file(System.getenv("CLIQUE_SIGNING_PROPERTIES") ?: "/root/.clique-android/signing.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val signedRelease = signingProps.containsKey("storeFile")
 
 android {
     namespace = "dev.useclique.android"
@@ -15,8 +36,20 @@ android {
         versionName = "0.1.5"
     }
 
+    signingConfigs {
+        if (signedRelease) {
+            create("release") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (signedRelease) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

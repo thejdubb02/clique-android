@@ -20,3 +20,6 @@ output-metadata.json
 # minified JS; keep xterm.LICENSE (and xterm.css, which is source).
 app/src/main/assets/vendor/*.js
 app/src/main/assets/vendor/.built-from
+
+# The F-Droid repo tree and the signing key live outside this repo, in
+# /root/.clique-android, so neither can be committed by accident.
