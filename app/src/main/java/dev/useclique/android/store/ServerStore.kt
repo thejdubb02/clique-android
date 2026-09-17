@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.store
+package dev.useclique.android.store
 
 import android.content.Context
 import android.content.SharedPreferences

@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.term
+package dev.useclique.android.term
 
 import android.os.Handler
 import android.os.Looper
@@ -10,7 +10,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONObject
-import org.willhitestrategy.clique.api.CliqueClient
+import dev.useclique.android.api.CliqueClient
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**

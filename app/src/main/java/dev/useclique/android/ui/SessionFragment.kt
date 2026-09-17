@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.ui
+package dev.useclique.android.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -21,11 +21,11 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.willhitestrategy.clique.MainActivity
-import org.willhitestrategy.clique.R
-import org.willhitestrategy.clique.api.CliqueClient
-import org.willhitestrategy.clique.notify.WaitService
-import org.willhitestrategy.clique.term.TerminalBridge
+import dev.useclique.android.MainActivity
+import dev.useclique.android.R
+import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.notify.WaitService
+import dev.useclique.android.term.TerminalBridge
 
 /**
  * Terminal in a WebView, prompt in a native EditText.

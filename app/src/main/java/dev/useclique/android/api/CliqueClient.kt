@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.api
+package dev.useclique.android.api
 
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -9,7 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
-import org.willhitestrategy.clique.store.Server
+import dev.useclique.android.store.Server
 import java.io.IOException
 
 class CliqueClient(

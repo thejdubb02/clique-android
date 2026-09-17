@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.notify
+package dev.useclique.android.notify
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,10 +12,10 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import org.willhitestrategy.clique.CliqueApp
-import org.willhitestrategy.clique.MainActivity
-import org.willhitestrategy.clique.R
-import org.willhitestrategy.clique.api.CliqueClient
+import dev.useclique.android.CliqueApp
+import dev.useclique.android.MainActivity
+import dev.useclique.android.R
+import dev.useclique.android.api.CliqueClient
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -161,8 +161,8 @@ class WaitService : Service() {
     }
 
     companion object {
-        const val ACTION_WATCH = "org.willhitestrategy.clique.WATCH"
-        const val ACTION_STOP = "org.willhitestrategy.clique.STOP_WATCH"
+        const val ACTION_WATCH = "dev.useclique.android.WATCH"
+        const val ACTION_STOP = "dev.useclique.android.STOP_WATCH"
         const val EXTRA_SERVER_ID = "serverId"
         const val EXTRA_SESSION_ID = "sessionId"
         const val EXTRA_NAME = "name"

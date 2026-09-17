@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.api
+package dev.useclique.android.api
 
 import okhttp3.OkHttpClient
 import java.io.ByteArrayInputStream

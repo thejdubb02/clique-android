@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.api
+package dev.useclique.android.api
 
 import org.json.JSONArray
 import org.json.JSONObject

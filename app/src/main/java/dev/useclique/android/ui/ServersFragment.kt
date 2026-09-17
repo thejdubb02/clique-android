@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.ui
+package dev.useclique.android.ui
 
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -14,10 +14,10 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.willhitestrategy.clique.MainActivity
-import org.willhitestrategy.clique.R
-import org.willhitestrategy.clique.api.CliqueClient
-import org.willhitestrategy.clique.store.Server
+import dev.useclique.android.MainActivity
+import dev.useclique.android.R
+import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.store.Server
 
 class ServersFragment : Fragment() {
 

@@ -1,4 +1,4 @@
-package org.willhitestrategy.clique.store
+package dev.useclique.android.store
 
 data class Server(
     val id: String,

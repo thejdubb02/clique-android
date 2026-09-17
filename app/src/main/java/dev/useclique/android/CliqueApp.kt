@@ -1,7 +1,7 @@
-package org.willhitestrategy.clique
+package dev.useclique.android
 
 import android.app.Application
-import org.willhitestrategy.clique.store.ServerStore
+import dev.useclique.android.store.ServerStore
 
 class CliqueApp : Application() {
     lateinit var store: ServerStore

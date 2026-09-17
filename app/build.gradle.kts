@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "org.willhitestrategy.clique"
+    namespace = "dev.useclique.android"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "org.willhitestrategy.clique"
+        applicationId = "dev.useclique.android"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

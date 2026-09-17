@@ -1,13 +1,13 @@
-package org.willhitestrategy.clique
+package dev.useclique.android
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
-import org.willhitestrategy.clique.ui.EditServerFragment
-import org.willhitestrategy.clique.ui.NewSessionFragment
-import org.willhitestrategy.clique.ui.ServersFragment
-import org.willhitestrategy.clique.ui.SessionFragment
-import org.willhitestrategy.clique.ui.SessionsFragment
+import dev.useclique.android.ui.EditServerFragment
+import dev.useclique.android.ui.NewSessionFragment
+import dev.useclique.android.ui.ServersFragment
+import dev.useclique.android.ui.SessionFragment
+import dev.useclique.android.ui.SessionsFragment
 
 class MainActivity : AppCompatActivity() {
 

@@ -49,6 +49,22 @@ Each one had to earn its place:
 | kotlinx-coroutines | `lifecycleScope` for UI work off the main thread. |
 | xterm.js (vendored, MIT) | The panel's terminal renderer, copied from CLIque. Display only; stdin is disabled. |
 
+## Known blocker for F-Droid: the bundled xterm.js
+
+`app/src/main/assets/vendor/xterm.js` is the minified distribution, copied from
+the server's own vendor directory. **F-Droid will not accept it in that form.**
+Their inclusion policy requires that everything shipped is built from source on
+their infrastructure, and a 488 KB single-line JavaScript file is a compiled
+artifact by their reckoning, not source. It is MIT and its provenance is
+documented, which is grounds for an appeal, not for assuming it will pass.
+
+The fix is to build xterm.js from source during the build rather than commit the
+result: F-Droid's build recipes may `sudo apt-get install npm` and run a
+`prebuild` step, which is how other apps with JavaScript assets handle this. It
+has to be done before submission, not after a rejection.
+
+Sideloading the APK is unaffected. This only gates distribution through F-Droid.
+
 ## What this pass does not do
 
 It pairs, lists sessions, opens a terminal, and sends a prompt. It does not reimplement the rest of the web panel (files, artifacts, broadcast, notes, settings). Those stay on the laptop.
