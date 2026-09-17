@@ -69,6 +69,13 @@ class CliqueClient(
         authed("api/sessions/$sessionId/send").post(payload)
     }
 
+    fun sendKey(sessionId: String, key: String) {
+        val payload = JSONObject()
+            .put("key", key)
+            .toString()
+        authed("api/sessions/$sessionId/send").post(payload)
+    }
+
     fun createSession(cli: String, cwd: String, name: String, folder: String?): String {
         val payload = JSONObject()
             .put("cli", cli)

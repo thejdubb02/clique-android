@@ -36,7 +36,30 @@
             android:focusableInTouchMode="false" />
     </FrameLayout>
 
-    <!-- Pinned above the keyboard via WindowInsets in SessionFragment. -->
+    <!--
+      Key bar and prompt ride the IME together: MainActivity pads the
+      fragment container from WindowInsets, so both stay above the keyboard.
+    -->
+    <HorizontalScrollView
+        android:id="@+id/key_bar_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ime_bar"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/key_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="4dp" />
+    </HorizontalScrollView>
+
     <LinearLayout
         android:id="@+id/prompt_bar"
         android:layout_width="match_parent"

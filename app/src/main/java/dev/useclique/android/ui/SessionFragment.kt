@@ -4,13 +4,17 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.webkit.WebView
+import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -105,6 +109,7 @@ class SessionFragment : Fragment() {
             }
         }
         view.findViewById<View>(R.id.send).setOnClickListener { sendPrompt() }
+        bindKeyBar(view.findViewById(R.id.key_bar))
 
         val web = view.findViewById<WebView>(R.id.terminal)
         web.isFocusable = false
@@ -144,6 +149,64 @@ class SessionFragment : Fragment() {
         bridge?.detach()
         bridge = null
         super.onDestroyView()
+    }
+
+    private fun bindKeyBar(row: LinearLayout) {
+        val minPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            48f,
+            resources.displayMetrics,
+        ).toInt()
+        val pad = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            4f,
+            resources.displayMetrics,
+        ).toInt()
+        for (key in KEY_BAR_KEYS) {
+            val btn = Button(requireContext()).apply {
+                text = getString(key.labelRes)
+                contentDescription = getString(key.spokenRes)
+                isAllCaps = false
+                isFocusable = false
+                isFocusableInTouchMode = false
+                setTextColor(ContextCompat.getColor(context, R.color.text))
+                background = ContextCompat.getDrawable(context, R.drawable.field_bg)
+                minHeight = minPx
+                minimumHeight = minPx
+                minWidth = minPx
+                minimumWidth = minPx
+                setPadding(pad * 3, pad, pad * 3, pad)
+                gravity = Gravity.CENTER
+                setOnClickListener { sendKeystroke(key.tmuxName) }
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = pad
+                marginEnd = pad
+            }
+            row.addView(btn, lp)
+        }
+    }
+
+    private fun sendKeystroke(key: String) {
+        val act = activity as MainActivity
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).sendKey(sessionId, key)
+                }
+                // Enter on a permission prompt starts a turn, so the same
+                // finish notification a typed prompt gets applies here. The
+                // keys that stop work instead make this return immediately.
+                WaitService.watch(requireContext(), serverId, sessionId, sessionName)
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), e.message ?: getString(R.string.send_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun sendPrompt() {

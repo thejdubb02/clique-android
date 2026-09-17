@@ -29,6 +29,20 @@
     <string name="archived">Archived</string>
     <string name="prompt_hint">Prompt</string>
     <string name="send">Send</string>
+    <string name="key_esc">Esc</string>
+    <string name="key_ctrl_c">^C</string>
+    <string name="key_tab">Tab</string>
+    <string name="key_up">↑</string>
+    <string name="key_down">↓</string>
+    <string name="key_enter">⏎</string>
+    <!-- Spoken by TalkBack. The visible labels are symbols and abbreviations
+         that a screen reader either mangles or skips entirely. -->
+    <string name="key_esc_spoken">Escape</string>
+    <string name="key_ctrl_c_spoken">Control C, interrupt</string>
+    <string name="key_tab_spoken">Tab</string>
+    <string name="key_up_spoken">Up arrow</string>
+    <string name="key_down_spoken">Down arrow</string>
+    <string name="key_enter_spoken">Enter</string>
     <string name="new_session">New session</string>
     <string name="session_name">Name</string>
     <string name="session_cwd">Directory</string>
