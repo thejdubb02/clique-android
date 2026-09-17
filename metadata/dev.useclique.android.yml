@@ -16,8 +16,12 @@ Builds:
     versionCode: 1
     commit: Unknown
     subdir: app
+    sudo:
+      - apt-get update
+      - apt-get install -y npm
     gradle:
       - yes
+    prebuild: ../tools/build-xterm.sh
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

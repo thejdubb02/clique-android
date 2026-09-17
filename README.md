@@ -47,23 +47,19 @@ Each one had to earn its place:
 | `androidx.security:security-crypto` | Named in the spec for the token store. |
 | OkHttp | REST and the `/ws` terminal stream. `HttpURLConnection` cannot do WebSockets, and one client carries the per-server CA for both. No Retrofit. |
 | kotlinx-coroutines | `lifecycleScope` for UI work off the main thread. |
-| xterm.js (vendored, MIT) | The panel's terminal renderer, copied from CLIque. Display only; stdin is disabled. |
+| xterm.js (built from source, MIT) | The panel's terminal renderer. Display only; stdin is disabled. |
 
-## Known blocker for F-Droid: the bundled xterm.js
+## xterm.js, built from source
 
-`app/src/main/assets/vendor/xterm.js` is the minified distribution, copied from
-the server's own vendor directory. **F-Droid will not accept it in that form.**
-Their inclusion policy requires that everything shipped is built from source on
-their infrastructure, and a 488 KB single-line JavaScript file is a compiled
-artifact by their reckoning, not source. It is MIT and its provenance is
-documented, which is grounds for an appeal, not for assuming it will pass.
+The JS under `app/src/main/assets/vendor/` is not committed. `./gradlew assembleDebug`
+runs `tools/build-xterm.sh` when those files are missing: it clones [xterm.js](https://github.com/xtermjs/xterm.js)
+at tag **5.5.0** (the same pin as the CLIque server), builds core plus the fit,
+unicode11 and canvas addons, and copies the UMD bundles into `vendor/`. A later
+build that already has the files does not use the network, so `--offline` still
+works.
 
-The fix is to build xterm.js from source during the build rather than commit the
-result: F-Droid's build recipes may `sudo apt-get install npm` and run a
-`prebuild` step, which is how other apps with JavaScript assets handle this. It
-has to be done before submission, not after a rejection.
-
-Sideloading the APK is unaffected. This only gates distribution through F-Droid.
+F-Droid does the same in the recipe (`sudo: apt-get install -y npm`, then the
+script as `prebuild`). `xterm.LICENSE` stays in the tree.
 
 ## What this pass does not do
 

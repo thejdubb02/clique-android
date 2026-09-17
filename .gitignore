@@ -15,3 +15,8 @@ captures/
 *.hprof
 .navigation/
 output-metadata.json
+
+# Built from source by tools/build-xterm.sh. F-Droid will not accept committed
+# minified JS; keep xterm.LICENSE (and xterm.css, which is source).
+app/src/main/assets/vendor/*.js
+app/src/main/assets/vendor/.built-from

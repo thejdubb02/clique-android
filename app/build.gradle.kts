@@ -48,6 +48,30 @@ android {
     }
 }
 
+// xterm.js UMD bundles are built from source (tools/build-xterm.sh) and must
+// not be committed. Run that script only when they are missing so a later
+// `./gradlew --offline assembleDebug` never touches the network.
+val xtermVendorJs = listOf(
+    "xterm.js",
+    "addon-fit.js",
+    "addon-unicode11.js",
+    "addon-canvas.js",
+).map { file("src/main/assets/vendor/$it") }
+
+val buildXtermIfMissing = tasks.register<Exec>("buildXtermIfMissing") {
+    group = "build"
+    description = "Build xterm.js from source when vendor JS is missing"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "tools/build-xterm.sh")
+    onlyIf { xtermVendorJs.any { !it.exists() } }
+}
+
+tasks.configureEach {
+    if (name == "mergeDebugAssets" || name == "mergeReleaseAssets") {
+        dependsOn(buildXtermIfMissing)
+    }
+}
+
 dependencies {
     // AndroidX platform pieces. No Play Services, no Firebase, no analytics.
     implementation("androidx.appcompat:appcompat:1.7.0")
