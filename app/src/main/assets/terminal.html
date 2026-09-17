@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #0E1116;
+      overflow: hidden;
+    }
+    #term {
+      position: absolute;
+      inset: 0;
+    }
+    /* xterm's hidden textarea is an IME target. This app's prompt is a native
+       EditText. If this field can take focus, Gboard types into the pane. */
+    .xterm-helper-textarea,
+    textarea {
+      pointer-events: none !important;
+      opacity: 0 !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="term"></div>
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="vendor/addon-unicode11.js"></script>
+  <script src="vendor/addon-canvas.js"></script>
+  <script>
+    const term = new Terminal({
+      disableStdin: true,
+      convertEol: false,
+      fontSize: 13,
+      fontFamily: 'monospace',
+      theme: { background: '#0E1116', foreground: '#E6EDF3', cursor: '#5FA8F5' },
+      scrollback: 8000,
+      cursorBlink: false,
+      allowProposedApi: true
+    });
+    if (window.Unicode11Addon) {
+      term.loadAddon(new Unicode11Addon.Unicode11Addon());
+      term.unicode.activeVersion = '11';
+    }
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open(document.getElementById('term'));
+    if (window.CanvasAddon) {
+      try { term.loadAddon(new CanvasAddon.CanvasAddon()); } catch (e) {}
+    }
+    const lockTextarea = () => {
+      document.querySelectorAll('textarea').forEach((ta) => {
+        ta.setAttribute('readonly', 'true');
+        ta.setAttribute('disabled', 'true');
+        ta.tabIndex = -1;
+        ta.blur();
+      });
+    };
+    lockTextarea();
+    document.addEventListener('focusin', (e) => {
+      if (e.target && e.target.tagName === 'TEXTAREA') {
+        e.target.blur();
+        lockTextarea();
+      }
+    });
+    const reportSize = () => {
+      fit.fit();
+      lockTextarea();
+      if (window.CliqueBridge) {
+        CliqueBridge.onSize(term.cols, term.rows);
+      }
+    };
+    window.termWrite = (b64) => {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      term.write(bytes);
+    };
+    window.termFit = reportSize;
+    window.onresize = reportSize;
+    setTimeout(() => {
+      reportSize();
+      if (window.CliqueBridge) CliqueBridge.onReady(term.cols, term.rows);
+    }, 50);
+  </script>
+</body>
+</html>

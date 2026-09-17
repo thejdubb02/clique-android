@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Clique" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="android:navigationBarColor">@color/ink</item>
+        <item name="android:windowBackground">@color/ink</item>
+        <item name="android:colorBackground">@color/ink</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryDark">@color/ink</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/muted</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="editTextColor">@color/text</item>
+        <item name="android:editTextColor">@color/text</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+        <item name="actionMenuTextColor">@color/text</item>
+        <item name="android:popupMenuStyle">@style/Popup.Clique</item>
+    </style>
+
+    <style name="Popup.Clique" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@color/surface_2</item>
+    </style>
+
+    <style name="Toolbar.Clique" parent="Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/ink</item>
+        <item name="titleTextColor">@color/text</item>
+        <item name="subtitleTextColor">@color/muted</item>
+        <item name="colorControlNormal">@color/text</item>
+    </style>
+
+    <style name="Field">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textColorHint">@color/hint</item>
+        <item name="android:background">@drawable/field_bg</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+    </style>
+</resources>

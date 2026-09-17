@@ -1,0 +1,169 @@
+package org.willhitestrategy.clique.api
+
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.json.JSONObject
+import org.willhitestrategy.clique.store.Server
+import java.io.IOException
+
+class CliqueClient(
+    val server: Server,
+    private val token: String?,
+    private val http: OkHttpClient = Tls.httpClient(server.caPem),
+) {
+    private val base: HttpUrl = server.baseUrl.trimEnd('/').toHttpUrl()
+    private val waitHttp: OkHttpClient = http.newBuilder()
+        .readTimeout(320, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    fun healthz(): Boolean {
+        val req = Request.Builder().url(url("healthz")).get().build()
+        http.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return false
+            val body = resp.body?.string().orEmpty()
+            return try {
+                JSONObject(body).optBoolean("ok")
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    fun claim(code: String, name: String): Claim {
+        val payload = JSONObject()
+            .put("code", code)
+            .put("name", name)
+            .toString()
+        val req = Request.Builder()
+            .url(url("api/pair/claim"))
+            .post(payload.toRequestBody(JSON))
+            .build()
+        http.newCall(req).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (resp.code != 201) throw ApiException(resp.code, body)
+            val o = JSONObject(body)
+            return Claim(
+                token = o.getString("token"),
+                id = o.optString("id"),
+                name = o.optString("name"),
+            )
+        }
+    }
+
+    fun state(): PanelState {
+        val o = JSONObject(authed("api/state").get())
+        return parseState(o)
+    }
+
+    fun send(sessionId: String, text: String, enter: Boolean = true) {
+        val payload = JSONObject()
+            .put("text", text)
+            .put("enter", enter)
+            .toString()
+        authed("api/sessions/$sessionId/send").post(payload)
+    }
+
+    fun createSession(cli: String, cwd: String, name: String, folder: String?): String {
+        val payload = JSONObject()
+            .put("cli", cli)
+            .put("cwd", cwd)
+        if (name.isNotBlank()) payload.put("name", name)
+        if (!folder.isNullOrBlank()) payload.put("folder", folder)
+        val body = authed("api/sessions").post(payload.toString(), expected = 201)
+        return JSONObject(body).getString("id")
+    }
+
+    fun kill(sessionId: String) {
+        authed("api/sessions/$sessionId/kill").post("{}")
+    }
+
+    fun start(sessionId: String) {
+        authed("api/sessions/$sessionId/start").post("{}")
+    }
+
+    fun delete(sessionId: String) {
+        authed("api/sessions/$sessionId").delete()
+    }
+
+    fun wait(sessionId: String, forStates: String = "idle,waiting,error,stopped", timeout: Int = 300): JSONObject {
+        val u = url("api/sessions/$sessionId/wait").newBuilder()
+            .addQueryParameter("for", forStates)
+            .addQueryParameter("timeout", timeout.toString())
+            .build()
+        val req = authedRequest(u).get().build()
+        waitHttp.newCall(req).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw ApiException(resp.code, body)
+            return JSONObject(body)
+        }
+    }
+
+    fun openTerminal(
+        sessionId: String,
+        cols: Int,
+        rows: Int,
+        listener: WebSocketListener,
+    ): WebSocket {
+        val wsUrl = base.newBuilder()
+            .scheme(if (base.isHttps) "wss" else "ws")
+            .addPathSegment("ws")
+            .addQueryParameter("id", sessionId)
+            .addQueryParameter("cols", cols.coerceAtLeast(20).toString())
+            .addQueryParameter("rows", rows.coerceAtLeast(8).toString())
+            .build()
+        val req = authedRequest(wsUrl).build()
+        return http.newWebSocket(req, listener)
+    }
+
+    fun sendControl(ws: WebSocket, json: JSONObject) {
+        ws.send(json.toString())
+    }
+
+    private fun url(path: String): HttpUrl {
+        val builder = base.newBuilder()
+        path.trim('/').split('/').filter { it.isNotEmpty() }.forEach { builder.addPathSegment(it) }
+        return builder.build()
+    }
+
+    private fun authed(path: String) = Call(authedRequest(url(path)))
+
+    private fun authedRequest(url: HttpUrl): Request.Builder {
+        val b = Request.Builder().url(url)
+        val t = token
+        if (!t.isNullOrBlank()) b.header("Authorization", "Bearer $t")
+        return b
+    }
+
+    inner class Call(private val builder: Request.Builder) {
+        fun get(): String = execute(builder.get().build())
+
+        fun post(json: String, expected: Int? = null): String =
+            execute(builder.post(json.toRequestBody(JSON)).build(), expected)
+
+        fun delete(): String = execute(builder.delete().build())
+    }
+
+    private fun execute(request: Request, expected: Int? = null): String {
+        http.newCall(request).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            val ok = if (expected != null) resp.code == expected else resp.isSuccessful
+            if (!ok) throw ApiException(resp.code, body)
+            return body
+        }
+    }
+
+    companion object {
+        private val JSON = "application/json; charset=utf-8".toMediaType()
+
+        fun forServer(server: Server, token: String?): CliqueClient {
+            if (server.baseUrl.isBlank()) throw IOException("empty URL")
+            return CliqueClient(server, token)
+        }
+    }
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trust the system store and user-installed CAs. Private-CA and self-signed
+  panels are how these servers are usually reached; the operator installs the
+  CA in Android's user store, or pastes a PEM on the server row. Certificate
+  validation is never disabled.
+  Cleartext is permitted because a panel on a VPN (Tailscale, WireGuard) is
+  often http:// on the tailnet.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

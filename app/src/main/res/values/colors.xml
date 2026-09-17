@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ink">#FF0E1116</color>
+    <color name="surface">#FF161B22</color>
+    <color name="surface_2">#FF21262D</color>
+    <color name="text">#FFE6EDF3</color>
+    <color name="muted">#FF8B949E</color>
+    <color name="accent">#FF5FA8F5</color>
+    <color name="violet">#FFA855F7</color>
+    <color name="cyan">#FF22D3EE</color>
+    <color name="alive">#FF22C55E</color>
+    <color name="waiting">#FFFBBF24</color>
+    <color name="error">#FFEF4444</color>
+    <color name="stopped">#FF6B7280</color>
+    <color name="hint">#FF6E7681</color>
+    <color name="ripple">#335FA8F5</color>
+    <color name="bar">#FF0E1116</color>
+    <color name="ime_bar">#FF161B22</color>
+    <color name="launcher_bg">#FF0E1116</color>
+</resources>

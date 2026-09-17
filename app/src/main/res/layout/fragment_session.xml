@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Native chrome around a web-rendered terminal.
+  The prompt is a real android.widget.EditText in this layout. It is not
+  inside the WebView. That is the point of the app.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/session_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/ink"
+    android:fitsSystemWindows="false">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:theme="@style/Toolbar.Clique" />
+
+    <!--
+      Terminal only. Focus is blocked so xterm's hidden textarea cannot
+      steal the IME. Output is written from the native WebSocket bridge.
+    -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:descendantFocusability="blocksDescendants">
+
+        <WebView
+            android:id="@+id/terminal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:focusable="false"
+            android:focusableInTouchMode="false" />
+    </FrameLayout>
+
+    <!-- Pinned above the keyboard via WindowInsets in SessionFragment. -->
+    <LinearLayout
+        android:id="@+id/prompt_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/prompt_bar_bg"
+        android:padding="8dp"
+        android:gravity="bottom">
+
+        <EditText
+            android:id="@+id/prompt_input"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:minLines="1"
+            android:maxLines="6"
+            android:gravity="top|start"
+            android:padding="10dp"
+            android:background="@drawable/field_bg"
+            android:textColor="@color/text"
+            android:textColorHint="@color/hint"
+            android:hint="@string/prompt_hint"
+            android:inputType="textCapSentences|textAutoCorrect|textMultiLine"
+            android:imeOptions="actionSend"
+            android:imeActionLabel="@string/send"
+            android:importantForAutofill="no" />
+
+        <Button
+            android:id="@+id/send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minHeight="48dp"
+            android:background="@drawable/btn_accent"
+            android:text="@string/send"
+            android:textAllCaps="false"
+            android:textColor="@color/ink" />
+    </LinearLayout>
+</LinearLayout>

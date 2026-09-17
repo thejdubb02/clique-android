@@ -1,0 +1,7 @@
+Native Android client for CLIque, a self-hosted panel that runs folder-organised, CLI-agnostic coding sessions in tmux.
+
+The prompt is a real Android EditText, not a text field inside a WebView. Android keyboards fight WebView inputs; that bug is why this app exists. The terminal is the panel's own xterm.js pane. Native chrome, native input, web-rendered terminal.
+
+Pair with a short code from the web panel instead of typing a forty-character token. Talk to a self-hosted server, including over a VPN. A private CA can be installed in Android's user store or pasted as PEM. Certificate validation is never turned off.
+
+Free software, MIT, no Google Play Services, no analytics.

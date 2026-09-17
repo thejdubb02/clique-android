@@ -1,0 +1,25 @@
+Categories:
+  - Development
+License: MIT
+AuthorName: Justin Willhite
+WebSite: https://github.com/thejdubb02/clique
+SourceCode: https://github.com/thejdubb02/clique-android
+IssueTracker: https://github.com/thejdubb02/clique-android/issues
+Name: CLIque
+AutoName: CLIque
+
+RepoType: git
+Repo: https://github.com/thejdubb02/clique-android.git
+
+Builds:
+  - versionName: '0.1.0'
+    versionCode: 1
+    commit: Unknown
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
