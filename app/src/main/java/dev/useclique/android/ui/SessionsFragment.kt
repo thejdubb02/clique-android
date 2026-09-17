@@ -1,15 +1,18 @@
 package dev.useclique.android.ui
 
+import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -36,7 +39,11 @@ class SessionsFragment : Fragment() {
     private lateinit var list: RecyclerView
     private lateinit var empty: TextView
     private lateinit var refresh: SwipeRefreshLayout
+    private lateinit var toolbar: androidx.appcompat.widget.Toolbar
     private val items = mutableListOf<Item>()
+    private var lastState: PanelState? = null
+    private var query: String = ""
+    private var activeOnly: Boolean = true
     private val handler = Handler(Looper.getMainLooper())
     private val poll = object : Runnable {
         override fun run() {
@@ -58,16 +65,28 @@ class SessionsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val act = activity as MainActivity
         val server = act.app.store.get(serverId)
-        val toolbar = view.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        activeOnly = requireContext()
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ACTIVE_ONLY, true)
+        toolbar = view.findViewById(R.id.toolbar)
         toolbar.title = server?.name ?: getString(R.string.sessions_title)
         toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
         toolbar.setNavigationOnClickListener { act.showServers() }
         toolbar.inflateMenu(R.menu.sessions)
+        setupSearch(toolbar.menu.findItem(R.id.search))
+        syncToggle()
         toolbar.setOnMenuItemClickListener {
-            if (it.itemId == R.id.edit_server) {
-                act.showEditServer(serverId)
-                true
-            } else false
+            when (it.itemId) {
+                R.id.edit_server -> {
+                    act.showEditServer(serverId)
+                    true
+                }
+                R.id.active_only -> {
+                    setActiveOnly(!activeOnly)
+                    true
+                }
+                else -> false
+            }
         }
         list = view.findViewById(R.id.list)
         empty = view.findViewById(R.id.empty)
@@ -111,17 +130,84 @@ class SessionsFragment : Fragment() {
         }
     }
 
+    private fun setupSearch(item: MenuItem?) {
+        val searchView = item?.actionView as? SearchView ?: return
+        searchView.queryHint = getString(R.string.search_sessions)
+        searchView.maxWidth = Int.MAX_VALUE
+        searchView.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)?.apply {
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.text))
+            setHintTextColor(ContextCompat.getColor(requireContext(), R.color.hint))
+        }
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(q: String): Boolean {
+                setQuery(q)
+                searchView.clearFocus()
+                return true
+            }
+            override fun onQueryTextChange(q: String): Boolean {
+                setQuery(q)
+                return true
+            }
+        })
+        item.setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
+            override fun onMenuItemActionExpand(item: MenuItem): Boolean = true
+            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                setQuery("")
+                return true
+            }
+        })
+    }
+
+    private fun setQuery(q: String) {
+        if (query == q) return
+        query = q
+        lastState?.let { bind(it) }
+    }
+
+    private fun setActiveOnly(on: Boolean) {
+        if (activeOnly == on) return
+        activeOnly = on
+        requireContext()
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ACTIVE_ONLY, on)
+            .apply()
+        syncToggle()
+        lastState?.let { bind(it) }
+    }
+
+    private fun syncToggle() {
+        if (!::toolbar.isInitialized) return
+        val item = toolbar.menu.findItem(R.id.active_only) ?: return
+        item.isChecked = activeOnly
+        item.setTitle(if (activeOnly) R.string.filter_running else R.string.filter_all)
+        item.contentDescription = getString(
+            if (activeOnly) R.string.showing_running else R.string.showing_all,
+        )
+    }
+
     private fun bind(state: PanelState) {
+        lastState = state
         items.clear()
         val folderNames = state.folders.associate { it.id to it.name }
-        for (item in groupSessions(state.sessions, state.folders)) {
+        for (item in groupSessions(state.sessions, state.folders, query, activeOnly)) {
             when (item) {
                 is SessionListItem.Header -> items.add(Item.Header(headerTitle(item.id, folderNames)))
                 is SessionListItem.Row -> items.add(Item.Row(item.session))
             }
         }
         list.adapter?.notifyDataSetChanged()
-        empty.visibility = if (state.sessions.isEmpty()) View.VISIBLE else View.GONE
+        when {
+            state.sessions.isEmpty() -> {
+                empty.text = getString(R.string.empty_sessions)
+                empty.visibility = View.VISIBLE
+            }
+            items.isEmpty() -> {
+                empty.text = getString(R.string.empty_filter)
+                empty.visibility = View.VISIBLE
+            }
+            else -> empty.visibility = View.GONE
+        }
     }
 
     private fun headerTitle(id: String, folderNames: Map<String, String>): String {
@@ -233,6 +319,8 @@ class SessionsFragment : Fragment() {
 
     companion object {
         private const val ARG_SERVER = "serverId"
+        private const val PREFS = "session_list"
+        private const val KEY_ACTIVE_ONLY = "active_only"
         fun newInstance(serverId: String) = SessionsFragment().apply {
             arguments = Bundle().apply { putString(ARG_SERVER, serverId) }
         }

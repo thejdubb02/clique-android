@@ -24,6 +24,12 @@
     <string name="paired">Paired</string>
     <string name="empty_servers">Add the panel URL, tap Pair, type the code shown on the laptop.</string>
     <string name="empty_sessions">No sessions on this server.</string>
+    <string name="empty_filter">Nothing matches.</string>
+    <string name="search_sessions">Search sessions</string>
+    <string name="filter_running">Running</string>
+    <string name="filter_all">All</string>
+    <string name="showing_running">Showing only running sessions</string>
+    <string name="showing_all">Showing all sessions</string>
     <string name="running">Running</string>
     <string name="ungrouped">Ungrouped</string>
     <string name="archived">Archived</string>

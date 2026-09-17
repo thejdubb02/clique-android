@@ -2,6 +2,20 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/search"
+        android:title="@string/search_sessions"
+        android:icon="@drawable/ic_search"
+        android:contentDescription="@string/search_sessions"
+        app:showAsAction="always|collapseActionView"
+        app:actionViewClass="androidx.appcompat.widget.SearchView" />
+    <item
+        android:id="@+id/active_only"
+        android:title="@string/filter_running"
+        android:contentDescription="@string/showing_running"
+        android:checkable="true"
+        android:checked="true"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/edit_server"
         android:title="@string/edit_server"
         app:showAsAction="never" />

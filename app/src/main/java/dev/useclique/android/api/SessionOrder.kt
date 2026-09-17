@@ -14,8 +14,20 @@ sealed class SessionListItem {
  * [folders] order, then Archived. Empty groups are omitted. Pinned sessions
  * float to the top of their group; [sortedBy] is stable so the server's
  * order is kept within the pinned and within the rest.
+ *
+ * [query] is matched, case-insensitively, against name, cwd and branch.
+ * A non-empty query overrides [activeOnly], so a search can find a stopped
+ * session. That is the web panel's rule.
  */
-fun groupSessions(sessions: List<Session>, folders: List<Folder>): List<SessionListItem> {
+fun groupSessions(
+    sessions: List<Session>,
+    folders: List<Folder>,
+    query: String = "",
+    activeOnly: Boolean = false,
+): List<SessionListItem> {
+    val q = query.trim().lowercase()
+    val shown = sessions.filter { matches(it, q, activeOnly) }
+
     val known = folders.map { it.id }.toHashSet()
     fun filed(s: Session) = s.folder != null && s.folder in known
     fun pinFirst(group: List<Session>) = group.sortedBy { if (it.pinned) 0 else 1 }
@@ -27,7 +39,7 @@ fun groupSessions(sessions: List<Session>, folders: List<Folder>): List<SessionL
         for (session in pinFirst(group)) out.add(SessionListItem.Row(session))
     }
 
-    val live = sessions.filter { !it.archived }
+    val live = shown.filter { !it.archived }
     val running = live.filter { it.alive && !filed(it) }
     emit(GROUP_RUNNING, running)
 
@@ -38,6 +50,14 @@ fun groupSessions(sessions: List<Session>, folders: List<Folder>): List<SessionL
         emit(folder.id, live.filter { it.folder == folder.id })
     }
 
-    emit(GROUP_ARCHIVED, sessions.filter { it.archived })
+    emit(GROUP_ARCHIVED, shown.filter { it.archived })
     return out
+}
+
+private fun matches(s: Session, query: String, activeOnly: Boolean): Boolean {
+    if (activeOnly && !s.alive && query.isEmpty()) return false
+    if (query.isEmpty()) return true
+    return s.name.lowercase().contains(query)
+        || s.cwd.lowercase().contains(query)
+        || s.branch.lowercase().contains(query)
 }

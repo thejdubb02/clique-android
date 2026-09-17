@@ -77,6 +77,58 @@ class SessionOrderTest {
         assertTrue("f-empty" !in headers)
     }
 
+    @Test
+    fun activeOnlyHidesStoppedAndKeepsLive() {
+        val idle = session("idle")
+        val live = session("live", alive = true)
+        val items = groupSessions(listOf(idle, live), emptyList(), query = "", activeOnly = true)
+        assertEquals(listOf("H:$GROUP_RUNNING", "R:live"), labels(items))
+    }
+
+    @Test
+    fun queryBringsStoppedBackDespiteActiveOnly() {
+        val live = session("live", alive = true)
+        val stopped = session("old-notes")
+        val items = groupSessions(listOf(live, stopped), emptyList(), query = "notes", activeOnly = true)
+        assertEquals(listOf("H:$GROUP_UNGROUPED", "R:old-notes"), labels(items))
+    }
+
+    @Test
+    fun queryMatchesNameCwdAndBranchIgnoringCase() {
+        val byName = session("n", name = "Alpha")
+        val byCwd = session("c", name = "other", cwd = "/tmp/AlphaProject")
+        val byBranch = session("b", name = "other", branch = "feature/Alpha")
+        val miss = session("m", name = "nope", cwd = "/tmp", branch = "main")
+        val items = groupSessions(listOf(byName, byCwd, byBranch, miss), emptyList(), query = "aLpHa")
+        assertEquals(listOf("R:n", "R:c", "R:b"), labels(items).filter { it.startsWith("R:") })
+    }
+
+    @Test
+    fun filteredOutGroupProducesNoHeader() {
+        val work = folder("f-work", "Work")
+        val live = session("live", alive = true)
+        val filed = session("filed", folder = work.id)
+        val items = groupSessions(listOf(live, filed), listOf(work), query = "", activeOnly = true)
+        val headers = items.filterIsInstance<SessionListItem.Header>().map { it.id }
+        assertEquals(listOf(GROUP_RUNNING), headers)
+        assertTrue("f-work" !in headers)
+    }
+
+    @Test
+    fun emptyQueryActiveOnlyOffMatchesPreviousOrder() {
+        val work = folder("f-work", "Work")
+        val live = session("live", alive = true)
+        val idle = session("idle")
+        val filed = session("filed", folder = work.id)
+        val archived = session("old", archived = true)
+        val sessions = listOf(live, idle, filed, archived)
+        val folders = listOf(work)
+        assertEquals(
+            groupSessions(sessions, folders),
+            groupSessions(sessions, folders, query = "", activeOnly = false),
+        )
+    }
+
     private fun labels(items: List<SessionListItem>): List<String> {
         return items.map {
             when (it) {
@@ -94,12 +146,15 @@ class SessionOrderTest {
         folder: String? = null,
         pinned: Boolean = false,
         archived: Boolean = false,
+        name: String = id,
+        cwd: String = "/",
+        branch: String = "",
     ) = Session(
         id = id,
-        name = id,
+        name = name,
         cli = "claude",
         cliLabel = "Claude",
-        cwd = "/",
+        cwd = cwd,
         folder = folder,
         alive = alive,
         busy = false,
@@ -107,5 +162,6 @@ class SessionOrderTest {
         saying = "",
         pinned = pinned,
         archived = archived,
+        branch = branch,
     )
 }
