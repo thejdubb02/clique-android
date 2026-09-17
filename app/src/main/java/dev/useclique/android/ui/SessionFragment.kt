@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -15,6 +17,7 @@ import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -26,6 +29,8 @@ import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
 import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.api.Session
+import dev.useclique.android.api.wantsPermission
 import dev.useclique.android.notify.WaitService
 import dev.useclique.android.term.TerminalBridge
 
@@ -41,6 +46,25 @@ class SessionFragment : Fragment() {
     private var bridge: TerminalBridge? = null
     private var sessionName: String = ""
     private lateinit var prompt: EditText
+    private lateinit var toolbar: androidx.appcompat.widget.Toolbar
+    private val handler = Handler(Looper.getMainLooper())
+
+    /*
+      Hiding the banner on tap is not enough on its own. The signal clears when
+      the pane prints something after it, and the poll runs every three seconds,
+      so an answered prompt can still read as waiting on the very next poll and
+      put the buttons straight back under a thumb that is still there. Ignore
+      the signal briefly after answering; if it is genuinely still asking, the
+      poll after that says so.
+    */
+    private var answeredUntil = 0L
+    private val poll = object : Runnable {
+        override fun run() {
+            if (!isResumed) return
+            refreshState()
+            handler.postDelayed(this, 3000)
+        }
+    }
 
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -63,8 +87,8 @@ class SessionFragment : Fragment() {
         val token = store.token(serverId)
         sessionName = sessionId
 
-        val toolbar = view.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
-        toolbar.title = sessionId
+        toolbar = view.findViewById(R.id.toolbar)
+        toolbar.title = ""
         toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
         toolbar.setNavigationOnClickListener { parentFragmentManager.popBackStack() }
         toolbar.inflateMenu(R.menu.session)
@@ -109,6 +133,14 @@ class SessionFragment : Fragment() {
             }
         }
         view.findViewById<View>(R.id.send).setOnClickListener { sendPrompt() }
+        view.findViewById<View>(R.id.permission_approve).setOnClickListener {
+            answered(view)
+            sendKeystroke("Enter")
+        }
+        view.findViewById<View>(R.id.permission_deny).setOnClickListener {
+            answered(view)
+            sendKeystroke("Escape")
+        }
         bindKeyBar(view.findViewById(R.id.key_bar))
 
         val web = view.findViewById<WebView>(R.id.terminal)
@@ -117,19 +149,7 @@ class SessionFragment : Fragment() {
         val client = CliqueClient.forServer(server, token)
         bridge = TerminalBridge(web, client, sessionId).also { it.attach() }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val state = withContext(Dispatchers.IO) { client.state() }
-                val session = state.sessions.firstOrNull { it.id == sessionId }
-                if (session != null && isAdded) {
-                    sessionName = session.name
-                    toolbar.title = session.name
-                    toolbar.subtitle = session.cliLabel
-                }
-            } catch (_: Exception) {
-            }
-        }
-
+        refreshState()
         maybeAskNotifications()
     }
 
@@ -137,18 +157,63 @@ class SessionFragment : Fragment() {
         super.onResume()
         WaitService.onScreen = "$serverId:$sessionId"
         bridge?.hold()
+        handler.removeCallbacks(poll)
+        handler.postDelayed(poll, 3000)
     }
 
     override fun onPause() {
+        handler.removeCallbacks(poll)
         if (WaitService.onScreen == "$serverId:$sessionId") WaitService.onScreen = null
         bridge?.release()
         super.onPause()
     }
 
     override fun onDestroyView() {
+        handler.removeCallbacks(poll)
         bridge?.detach()
         bridge = null
         super.onDestroyView()
+    }
+
+    private fun refreshState() {
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val state = withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).state()
+                }
+                val session = state.sessions.firstOrNull { it.id == sessionId } ?: return@launch
+                if (isAdded) applySession(session)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun answered(view: View) {
+        answeredUntil = System.currentTimeMillis() + ANSWER_QUIET_MS
+        view.findViewById<View>(R.id.permission_banner).visibility = View.GONE
+    }
+
+    private fun applySession(session: Session) {
+        sessionName = session.name
+        toolbar.title = session.name
+        toolbar.subtitle = session.cliLabel
+        val banner = view?.findViewById<View>(R.id.permission_banner) ?: return
+        val text = view?.findViewById<TextView>(R.id.permission_text) ?: return
+        if (System.currentTimeMillis() < answeredUntil) {
+            banner.visibility = View.GONE
+        } else if (wantsPermission(session)) {
+            text.text = if (session.saying.isNotEmpty()) {
+                getString(R.string.wants_approval) + " · " + session.saying
+            } else {
+                getString(R.string.wants_approval)
+            }
+            banner.visibility = View.VISIBLE
+        } else {
+            banner.visibility = View.GONE
+        }
     }
 
     private fun bindKeyBar(row: LinearLayout) {
@@ -259,6 +324,7 @@ class SessionFragment : Fragment() {
     }
 
     companion object {
+        private const val ANSWER_QUIET_MS = 6000L
         private const val ARG_SERVER = "serverId"
         private const val ARG_SESSION = "sessionId"
 

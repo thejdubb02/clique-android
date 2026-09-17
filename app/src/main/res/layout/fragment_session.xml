@@ -37,6 +37,70 @@
     </FrameLayout>
 
     <!--
+      Permission banner sits above the key bar. Hidden unless the session
+      is waiting on a permission prompt. Approve and Deny are kept apart
+      so a thumb reaching for Approve does not hit Deny.
+    -->
+    <LinearLayout
+        android:id="@+id/permission_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/surface"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/permission_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/permission_approve"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:minWidth="48dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:background="@drawable/btn_accent"
+                android:text="@string/approve"
+                android:textAllCaps="false"
+                android:textColor="@color/ink" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/permission_deny"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:minWidth="48dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:background="@drawable/field_bg"
+                android:text="@string/deny"
+                android:textAllCaps="false"
+                android:textColor="@color/error" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!--
       Key bar and prompt ride the IME together: MainActivity pads the
       fragment container from WindowInsets, so both stay above the keyboard.
     -->
