@@ -78,7 +78,7 @@ class WaitService : Service() {
                 val matched = result.optBoolean("matched")
                 val state = result.optString("state")
                 if (matched) {
-                    notifyDone(name, state, serverId, sessionId)
+                    if (key != onScreen) notifyDone(name, state, serverId, sessionId)
                     return
                 }
             }
@@ -170,6 +170,14 @@ class WaitService : Service() {
         private const val CHANNEL_DONE = "clique-done"
         private const val FG_ID = 3200
         private val ids = AtomicInteger(4000)
+
+        /**
+         * The session currently on screen, "serverId:sessionId", or null.
+         * Buzzing someone about a session they are already watching finish is
+         * noise, and it is the session they look at most.
+         */
+        @Volatile
+        var onScreen: String? = null
 
         private fun nextId() = ids.incrementAndGet()
 

@@ -164,9 +164,21 @@ class CliqueClient(
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
+        // One client per server, not one per call. The session list polls every
+        // three seconds and every CliqueClient brings its own OkHttp connection
+        // pool and dispatcher threads with it.
+        private val cached = HashMap<String, Pair<String, CliqueClient>>()
+
         fun forServer(server: Server, token: String?): CliqueClient {
             if (server.baseUrl.isBlank()) throw IOException("empty URL")
-            return CliqueClient(server, token)
+            val sig = "${server.baseUrl}|${server.caPem}|${token.orEmpty()}"
+            synchronized(cached) {
+                val hit = cached[server.id]
+                if (hit != null && hit.first == sig) return hit.second
+                val made = CliqueClient(server, token)
+                cached[server.id] = sig to made
+                return made
+            }
         }
     }
 }

@@ -30,6 +30,8 @@
     <string name="new_session">New session</string>
     <string name="session_name">Name</string>
     <string name="session_cwd">Directory</string>
+    <string name="session_cwd_hint">Home directory if left blank</string>
+    <string name="session_name_hint">Named after the directory if left blank</string>
     <string name="session_cli">CLI</string>
     <string name="session_folder">Folder</string>
     <string name="create">Create</string>

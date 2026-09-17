@@ -12,9 +12,12 @@
       background: #0E1116;
       overflow: hidden;
     }
+    /* A small inset, or the first character of every line sits flush against
+       the edge of the screen. FitAddon measures this element, so insetting it
+       costs a column, not a clipped one. */
     #term {
       position: absolute;
-      inset: 0;
+      inset: 4px 6px;
     }
     /* xterm's hidden textarea is an IME target. This app's prompt is a native
        EditText. If this field can take focus, Gboard types into the pane. */

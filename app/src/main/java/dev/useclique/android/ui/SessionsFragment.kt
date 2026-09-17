@@ -193,7 +193,6 @@ class SessionsFragment : Fragment() {
     }
 
     private fun showActions(session: Session) {
-        val act = activity as MainActivity
         val options = mutableListOf<String>()
         if (session.alive) options.add(getString(R.string.kill)) else options.add(getString(R.string.start))
         options.add(getString(R.string.delete))
@@ -204,7 +203,9 @@ class SessionsFragment : Fragment() {
                 when (label) {
                     getString(R.string.kill) -> runOp { it.kill(session.id) }
                     getString(R.string.start) -> runOp { it.start(session.id) }
-                    getString(R.string.delete) -> runOp { it.delete(session.id) }
+                    getString(R.string.delete) -> confirmDelete(session.name) {
+                        runOp { it.delete(session.id) }
+                    }
                 }
             }
             .show()

@@ -68,8 +68,8 @@ class SessionFragment : Fragment() {
             when (item.itemId) {
                 R.id.kill -> runOp { it.kill(sessionId) }
                 R.id.start -> runOp { it.start(sessionId) }
-                R.id.delete -> runOp(after = { parentFragmentManager.popBackStack() }) {
-                    it.delete(sessionId)
+                R.id.delete -> confirmDelete(sessionName) {
+                    runOp(after = { parentFragmentManager.popBackStack() }) { it.delete(sessionId) }
                 }
                 else -> return@setOnMenuItemClickListener false
             }
@@ -125,16 +125,17 @@ class SessionFragment : Fragment() {
             }
         }
 
-        prompt.requestFocus()
         maybeAskNotifications()
     }
 
     override fun onResume() {
         super.onResume()
+        WaitService.onScreen = "$serverId:$sessionId"
         bridge?.hold()
     }
 
     override fun onPause() {
+        if (WaitService.onScreen == "$serverId:$sessionId") WaitService.onScreen = null
         bridge?.hold()
         super.onPause()
     }
@@ -144,10 +145,6 @@ class SessionFragment : Fragment() {
         bridge = null
         super.onDestroyView()
     }
-
-    /**
-     * Keyboard insets, not a guessed height. The prompt bar sits above the IME.
-     */
 
     private fun sendPrompt() {
         val text = prompt.text.toString()
@@ -163,6 +160,12 @@ class SessionFragment : Fragment() {
                 }
                 WaitService.watch(requireContext(), serverId, sessionId, sessionName)
             } catch (e: Exception) {
+                // The field was cleared optimistically. Put it back rather than
+                // making him retype it from a toast.
+                if (prompt.text.isEmpty()) {
+                    prompt.setText(text)
+                    prompt.setSelection(text.length)
+                }
                 Toast.makeText(requireContext(), e.message ?: getString(R.string.send_failed), Toast.LENGTH_SHORT).show()
             }
         }

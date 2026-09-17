@@ -41,6 +41,8 @@
         <EditText
             android:id="@+id/cwd"
             style="@style/Field"
+            android:hint="@string/session_cwd_hint"
+            android:textColorHint="@color/hint"
             android:inputType="textUri"
             android:importantForAutofill="no" />
 
@@ -54,6 +56,8 @@
         <EditText
             android:id="@+id/name"
             style="@style/Field"
+            android:hint="@string/session_name_hint"
+            android:textColorHint="@color/hint"
             android:inputType="textCapSentences"
             android:importantForAutofill="no" />
 
