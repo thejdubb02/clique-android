@@ -22,8 +22,13 @@ import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
 import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.api.GROUP_ARCHIVED
+import dev.useclique.android.api.GROUP_RUNNING
+import dev.useclique.android.api.GROUP_UNGROUPED
 import dev.useclique.android.api.PanelState
 import dev.useclique.android.api.Session
+import dev.useclique.android.api.SessionListItem
+import dev.useclique.android.api.groupSessions
 
 class SessionsFragment : Fragment() {
 
@@ -108,23 +113,24 @@ class SessionsFragment : Fragment() {
 
     private fun bind(state: PanelState) {
         items.clear()
-        val byFolder = state.sessions.groupBy { it.folder }
-        val folders = state.folders
-        val seen = HashSet<String>()
-        for (folder in folders) {
-            val sessions = byFolder[folder.id].orEmpty()
-            if (sessions.isEmpty()) continue
-            items.add(Item.Header(folder.name))
-            sessions.forEach { items.add(Item.Row(it)) }
-            seen.add(folder.id)
-        }
-        val ungrouped = state.sessions.filter { it.folder == null || it.folder !in seen }
-        if (ungrouped.isNotEmpty()) {
-            items.add(Item.Header(getString(R.string.ungrouped)))
-            ungrouped.forEach { items.add(Item.Row(it)) }
+        val folderNames = state.folders.associate { it.id to it.name }
+        for (item in groupSessions(state.sessions, state.folders)) {
+            when (item) {
+                is SessionListItem.Header -> items.add(Item.Header(headerTitle(item.id, folderNames)))
+                is SessionListItem.Row -> items.add(Item.Row(item.session))
+            }
         }
         list.adapter?.notifyDataSetChanged()
         empty.visibility = if (state.sessions.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun headerTitle(id: String, folderNames: Map<String, String>): String {
+        return when (id) {
+            GROUP_RUNNING -> getString(R.string.running)
+            GROUP_UNGROUPED -> getString(R.string.ungrouped)
+            GROUP_ARCHIVED -> getString(R.string.archived)
+            else -> folderNames[id] ?: id
+        }
     }
 
     private sealed class Item {

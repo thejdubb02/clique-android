@@ -27,6 +27,8 @@ data class Session(
     val busy: Boolean,
     val state: String,
     val saying: String,
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
 )
 
 data class PanelState(
@@ -82,6 +84,8 @@ fun parseState(raw: JSONObject): PanelState {
                 }
             },
             saying = it.optStr("saying"),
+            pinned = it.optBoolean("pinned"),
+            archived = it.optBoolean("archived"),
         )
     } ?: emptyList()
 

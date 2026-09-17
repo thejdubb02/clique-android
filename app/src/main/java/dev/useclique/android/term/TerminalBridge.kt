@@ -56,7 +56,7 @@ class TerminalBridge(
     }
 
     fun detach() {
-        sendControl(JSONObject().put("type", "release"))
+        release()
         socket?.close(1000, "bye")
         socket = null
         opened = false
@@ -65,6 +65,10 @@ class TerminalBridge(
             webView.removeJavascriptInterface("CliqueBridge")
             webView.loadUrl("about:blank")
         }
+    }
+
+    fun release() {
+        sendControl(JSONObject().put("type", "release"))
     }
 
     fun hold() {

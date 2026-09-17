@@ -136,7 +136,7 @@ class SessionFragment : Fragment() {
 
     override fun onPause() {
         if (WaitService.onScreen == "$serverId:$sessionId") WaitService.onScreen = null
-        bridge?.hold()
+        bridge?.release()
         super.onPause()
     }
 

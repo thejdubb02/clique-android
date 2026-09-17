@@ -11,8 +11,8 @@ android {
         applicationId = "dev.useclique.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
     }
 
     buildTypes {
@@ -67,4 +67,7 @@ dependencies {
     // also carries the per-server private-CA trust store for both REST and the
     // terminal stream. No Retrofit.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // JVM unit tests. Test classpath only; not packaged.
+    testImplementation("junit:junit:4.13")
 }
