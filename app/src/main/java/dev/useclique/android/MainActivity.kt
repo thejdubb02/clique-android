@@ -18,6 +18,27 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
+        /* Pad for the system bars, once, for every screen.
+         *
+         * Targeting Android 15 means the app is laid out edge to edge whether
+         * it asks for it or not, so anything that does not pad for the bars
+         * draws underneath them: the title sits behind the status bar and the
+         * button at the bottom is cut in half by the navigation bar. Only the
+         * session screen was doing this, so every other screen was wrong.
+         *
+         * The keyboard is handled here too rather than per screen. Padding the
+         * container shrinks whatever is inside it, which is what puts a prompt
+         * above the keyboard instead of behind it.
+         */
+        val container = findViewById<android.view.View>(R.id.container)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(container) { v, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            v.setPadding(bars.left, bars.top, bars.right, maxOf(ime.bottom, bars.bottom))
+            insets
+        }
+        androidx.core.view.ViewCompat.requestApplyInsets(container)
+
         if (savedInstanceState == null) {
             val store = app.store
             val serverId = intent.getStringExtra(EXTRA_SERVER_ID) ?: store.selectedId

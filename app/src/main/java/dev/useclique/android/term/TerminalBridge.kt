@@ -17,6 +17,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Pipes the panel's /ws stream into a local xterm.js WebView.
  * The WebView is display-only. Keystrokes never go through it.
  */
+/** Base64 characters per evaluateJavascript call. A multiple of four, so
+ *  each chunk decodes on its own, and far enough under the Binder transaction
+ *  ceiling that escaping and the JS wrapper cannot push a chunk over it. */
+private const val CHUNK_CHARS = 48 * 1024
+
 class TerminalBridge(
     private val webView: WebView,
     private val client: CliqueClient,
@@ -116,10 +121,32 @@ class TerminalBridge(
         }, 1500)
     }
 
+    /**
+     * Hand the pane to the page in pieces.
+     *
+     * evaluateJavascript crosses a process boundary, and that transaction has
+     * a ceiling of roughly a megabyte. A running session sends its entire
+     * scrollback the moment a client attaches, and the server keeps 20,000
+     * lines, which base64s to several megabytes. Handing that over in one call
+     * does not fail gracefully, it kills the app: opening a busy session
+     * crashed every time while an empty one was fine, which is exactly the
+     * shape of a size limit rather than a bug in the terminal.
+     *
+     * Chunked on a multiple of four so every piece is valid base64 on its own,
+     * because the page decodes each one as it arrives rather than buffering.
+     * Posted in order to a FIFO queue, so the terminal sees the bytes in the
+     * order tmux sent them. No escaping: the base64 alphabet contains neither
+     * a quote nor a backslash.
+     */
     private fun write(b64: String) {
-        main.post {
-            val safe = b64.replace("\\", "\\\\").replace("'", "\\'")
-            webView.evaluateJavascript("window.termWrite && window.termWrite('$safe')", null)
+        var at = 0
+        while (at < b64.length) {
+            val end = minOf(at + CHUNK_CHARS, b64.length)
+            val piece = b64.substring(at, end)
+            main.post {
+                webView.evaluateJavascript("window.termWrite && window.termWrite('" + piece + "')", null)
+            }
+            at = end
         }
     }
 

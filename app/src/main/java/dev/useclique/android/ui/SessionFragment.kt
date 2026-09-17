@@ -14,8 +14,6 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +76,6 @@ class SessionFragment : Fragment() {
             true
         }
 
-        pinBarAboveKeyboard(view.findViewById(R.id.session_root))
 
         prompt = view.findViewById(R.id.prompt_input)
         // Real EditText. Enter sends; Shift+Enter inserts a newline.
@@ -151,15 +148,6 @@ class SessionFragment : Fragment() {
     /**
      * Keyboard insets, not a guessed height. The prompt bar sits above the IME.
      */
-    private fun pinBarAboveKeyboard(root: View) {
-        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(sys.left, sys.top, sys.right, maxOf(ime.bottom, sys.bottom))
-            insets
-        }
-        ViewCompat.requestApplyInsets(root)
-    }
 
     private fun sendPrompt() {
         val text = prompt.text.toString()
