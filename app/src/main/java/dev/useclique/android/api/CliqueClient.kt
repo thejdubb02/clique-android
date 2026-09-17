@@ -110,8 +110,11 @@ class CliqueClient(
         rows: Int,
         listener: WebSocketListener,
     ): WebSocket {
+        // NOT wss:// here. OkHttp's URL builder accepts only http and https and
+        // throws on anything else, which killed the app the instant a terminal
+        // opened. newWebSocket does the upgrade itself from an http(s) URL, so
+        // the scheme is left exactly as the panel's is.
         val wsUrl = base.newBuilder()
-            .scheme(if (base.isHttps) "wss" else "ws")
             .addPathSegment("ws")
             .addQueryParameter("id", sessionId)
             .addQueryParameter("cols", cols.coerceAtLeast(20).toString())
