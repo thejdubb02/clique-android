@@ -6,6 +6,8 @@ The prompt is a real Android `EditText`. That is the point of the app. The panel
 
 MIT, matching the server. Built to go on F-Droid: no Play Services, no Firebase, no analytics.
 
+The panel it drives is [CLIque](https://github.com/thejdubb02/clique), a Python standard-library server that keeps CLI sessions alive in tmux. This app talks to its HTTP API and nothing else, so it works against any panel you can reach.
+
 ## Pairing
 
 On the laptop, ask the panel for a pairing code (`POST /api/pair`, or the button in the web UI). On the phone: add the panel URL, tap Pair, type the code. Case and the dash are ignored. The token is stored in `EncryptedSharedPreferences`, one per server.
