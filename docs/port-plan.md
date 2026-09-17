@@ -9,7 +9,11 @@ Everything here already exists server-side and is documented in
 unless it says so, which is the point: **the API is the whole surface**, so a
 port is a UI job, not a protocol job.
 
-Status as of 0.1.4, 2026-09-17.
+Status as of 0.1.6, 2026-09-17.
+
+The app ships from our own F-Droid repository at https://fdroid.useclique.dev,
+so a release reaches a phone as an ordinary update notification. Cutting one is
+`python3 tools/publish.py`; see `docs/releasing.md`.
 
 ---
 
@@ -36,7 +40,7 @@ every other CLI here ask questions, and the answer is usually a keystroke.
 |---|---|---|
 | **Send a bare key** | `POST /api/sessions/<id>/send` `{"key":"C-c"}` | Already in the API, not exposed in the app. Escape, Ctrl-C, Enter, Up, Tab, and the digits. This is the single biggest gap: today a runaway agent cannot be stopped from the phone at all |
 | **Approve / Deny** | `sessions[].signal` + `signal_note` = `"permission"`, then a key | The panel's inbox offers two buttons when a CLI is asking permission. On a phone that is the whole job |
-| **A key bar above the prompt** | as above | Esc, Ctrl-C, Tab, arrows, Enter. Needs to be a visible control, not a long-press: see the phone rules in `CLAUDE.md` |
+| ~~**A key bar above the prompt**~~ | as above | Done in 0.1.5. Visible buttons at 48dp, riding the keyboard with the prompt, with spoken labels for the screen reader |
 | **Scroll the terminal** | none | Verify first. Touch scrolling reaches the WebView, but xterm's viewport has never been tested under a finger on a real device |
 | **Rename / move a session** | `PATCH /api/sessions/<id>` | Creating one from the phone works; correcting it does not |
 | **Interrupt from the list** | `POST /api/sessions/<id>/send` | Without opening the session |
@@ -74,7 +78,9 @@ operational, or are things nobody does standing up.
   landscape are untested.
 - **One server at a time.** The app holds several but the list only ever shows
   one. The panel has no equivalent, so this is the app's own debt.
-- **xterm.js is vendored minified**, which blocks F-Droid. See
-  `TASK-fdroid-xterm.md`.
+- ~~xterm.js is vendored minified, which blocks F-Droid.~~ Cleared: it builds
+  from source at the 5.5.0 pin the server uses. Submitting to the **official**
+  F-Droid catalogue is still outstanding and is a separate thing from our own
+  repo: it takes weeks of review and matters for strangers, not for us.
 - **No CI.** The repo has no remote yet, so the JVM tests added in 0.1.4 run
   only when someone runs them.
