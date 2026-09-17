@@ -10,12 +10,23 @@ MIT, matching the server. Built to go on F-Droid: no Play Services, no Firebase,
 
 On the laptop, ask the panel for a pairing code (`POST /api/pair`, or the button in the web UI). On the phone: add the panel URL, tap Pair, type the code. Case and the dash are ignored. The token is stored in `EncryptedSharedPreferences`, one per server.
 
+## Installing
+
+Add our F-Droid repository once and updates arrive on their own:
+
+```
+https://fdroid.useclique.dev/repo
+```
+
+The `/repo` matters. Detail, including the one-time uninstall if you already
+sideloaded a build: `docs/fdroid-repo.md`.
+
 ## Screens
 
 1. **Servers** — add, edit, remove. Reachability from `GET /healthz`.
-2. **Sessions** — grouped by folder, alive and working shown. Pull to refresh; polls every 3s while visible.
-3. **Session** — terminal in a WebView, native prompt bar pinned above the keyboard with WindowInsets. Send button, and Enter sends (Shift+Enter for a newline).
-4. **Notification** when a session that was working stops, from `GET /api/sessions/<id>/wait`.
+2. **Sessions** — Running first, then Ungrouped, then folders, then Archived, matching the web sidebar; pinned float. Opens on running sessions only, with a toolbar toggle for all and a search over name, directory and branch. A typed search overrides the filter, because the session you are looking for is often a stopped one. Pull to refresh; polls every 3s while visible.
+3. **Session** — terminal in a WebView, native prompt bar pinned above the keyboard with WindowInsets. Send button, and Enter sends (Shift+Enter for a newline). A key bar above the prompt sends one bare tmux key: Esc, ^C, Tab, up, down, Enter.
+4. **Notification** when a session that was working stops, from `GET /api/sessions/<id>/wait`. When it stopped to ask permission, that notification carries Approve and Deny, which send `Enter` and `Escape` without opening the app. That indirection is the point: opening a session attaches a tmux client, the pane repaints, and the panel reads output-after-a-signal as the session having carried on, so the signal is gone in under three seconds.
 
 ## Foreground service
 
