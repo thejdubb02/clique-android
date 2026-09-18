@@ -127,4 +127,8 @@ dependencies {
 
     // JVM unit tests. Test classpath only; not packaged.
     testImplementation("junit:junit:4.13")
+    // android.jar's org.json throws Stub! in a JVM test, so a parser test would
+    // pass against a class that never parsed anything. This is the real one,
+    // test classpath only, never in the APK.
+    testImplementation("org.json:json:20231013")
 }

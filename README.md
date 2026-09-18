@@ -61,6 +61,7 @@ Each one had to earn its place:
 | OkHttp | REST and the `/ws` terminal stream. `HttpURLConnection` cannot do WebSockets, and one client carries the per-server CA for both. No Retrofit. |
 | kotlinx-coroutines | `lifecycleScope` for UI work off the main thread. |
 | xterm.js (built from source, MIT) | The panel's terminal renderer. Display only; stdin is disabled. |
+| `org.json:json` (tests only) | `android.jar`'s `org.json` throws `Stub!` on the JVM, so the response parsers could not be tested at all. Test classpath only, never in the APK. |
 
 ## xterm.js, built from source
 

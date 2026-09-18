@@ -29,6 +29,19 @@
             android:textSize="16sp" />
 
         <TextView
+            android:id="@+id/peek_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:gravity="center"
+            android:textColor="@color/muted"
+            android:textSize="14sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <TextView
             android:id="@+id/cli"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -44,6 +57,18 @@
         android:layout_marginTop="4dp"
         android:textColor="@color/muted"
         android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/peek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="22dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="monospace"
+        android:textSize="12sp"
+        android:textColor="@color/muted"
+        android:maxLines="8"
+        android:visibility="gone" />
 
     <!--
       Approve and Deny on the row itself. Opening the session attaches a

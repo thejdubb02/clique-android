@@ -111,3 +111,13 @@ fun parseState(raw: JSONObject): PanelState {
         clis = clis,
     )
 }
+
+fun parsePeek(raw: JSONObject): List<String> {
+    val arr = raw.optJSONArray("lines") ?: return emptyList()
+    val out = ArrayList<String>(arr.length())
+    for (i in 0 until arr.length()) {
+        if (arr.isNull(i)) continue
+        out.add(arr.optString(i))
+    }
+    return out
+}

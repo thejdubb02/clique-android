@@ -114,6 +114,11 @@ class CliqueClient(
         authed("api/sessions/$sessionId").delete()
     }
 
+    fun peek(id: String, lines: Int): List<String> {
+        val body = authedQuery("api/sessions/$id/peek", "lines" to lines.toString()).get()
+        return parsePeek(JSONObject(body))
+    }
+
     fun wait(sessionId: String, forStates: String = "idle,waiting,error,stopped", timeout: Int = 300): JSONObject {
         val u = url("api/sessions/$sessionId/wait").newBuilder()
             .addQueryParameter("for", forStates)
@@ -158,6 +163,12 @@ class CliqueClient(
     }
 
     private fun authed(path: String) = Call(authedRequest(url(path)))
+
+    private fun authedQuery(path: String, vararg params: Pair<String, String>): Call {
+        val builder = url(path).newBuilder()
+        for ((key, value) in params) builder.addQueryParameter(key, value)
+        return Call(authedRequest(builder.build()))
+    }
 
     private fun authedRequest(url: HttpUrl): Request.Builder {
         val b = Request.Builder().url(url)

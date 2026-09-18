@@ -56,6 +56,8 @@ class SessionsFragment : Fragment() {
       put the buttons back under a thumb that is still there.
     */
     private val answeredUntil = HashMap<String, Long>()
+    private val expanded = HashSet<String>()
+    private val peekText = HashMap<String, String>()
     private val handler = Handler(Looper.getMainLooper())
     private val poll = object : Runnable {
         override fun run() {
@@ -132,6 +134,7 @@ class SessionsFragment : Fragment() {
                     CliqueClient.forServer(server, token).state()
                 }
                 bind(state)
+                refreshExpandedPeeks()
             } catch (e: Exception) {
                 if (!silent) {
                     Toast.makeText(requireContext(), e.message ?: getString(R.string.load_failed), Toast.LENGTH_SHORT).show()
@@ -211,6 +214,10 @@ class SessionsFragment : Fragment() {
                 is SessionListItem.Row -> items.add(Item.Row(item.session))
             }
         }
+        val liveIds = HashSet<String>(state.sessions.size)
+        for (session in state.sessions) liveIds.add(session.id)
+        expanded.retainAll(liveIds)
+        peekText.keys.retainAll(liveIds)
         list.adapter?.notifyDataSetChanged()
         when {
             state.sessions.isEmpty() -> {
@@ -222,6 +229,30 @@ class SessionsFragment : Fragment() {
                 empty.visibility = View.VISIBLE
             }
             else -> empty.visibility = View.GONE
+        }
+    }
+
+    private fun refreshExpandedPeeks() {
+        for (item in items) {
+            if (item is Item.Row && item.session.id in expanded) fetchPeek(item.session.id)
+        }
+    }
+
+    private fun fetchPeek(id: String) {
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val lines = withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).peek(id, 4)
+                }
+                peekText[id] = lines.joinToString("\n")
+                val pos = items.indexOfFirst { it is Item.Row && it.session.id == id }
+                if (pos >= 0) list.adapter?.notifyItemChanged(pos)
+            } catch (_: Exception) {
+                // A peek is not worth a toast during a three-second poll.
+            }
         }
     }
 
@@ -289,6 +320,8 @@ class SessionsFragment : Fragment() {
         val actions: View = view.findViewById(R.id.permission_actions)
         val approve: View = view.findViewById(R.id.permission_approve)
         val deny: View = view.findViewById(R.id.permission_deny)
+        val peek: TextView = view.findViewById(R.id.peek)
+        val peekToggle: TextView = view.findViewById(R.id.peek_toggle)
 
         fun bind(session: Session) {
             name.text = session.name
@@ -310,6 +343,28 @@ class SessionsFragment : Fragment() {
             actions.visibility = if (!quiet && wantsPermission(session)) View.VISIBLE else View.GONE
             approve.setOnClickListener { answerFromList(session, "Enter", actions) }
             deny.setOnClickListener { answerFromList(session, "Escape", actions) }
+            val open = session.id in expanded
+            peekToggle.text = if (open) "▼" else "▶"
+            peekToggle.contentDescription = getString(if (open) R.string.peek_hide else R.string.peek_show)
+            if (open) {
+                peek.visibility = View.VISIBLE
+                val cached = peekText[session.id]
+                peek.text = when {
+                    cached == null -> getString(R.string.peek_loading)
+                    cached.isEmpty() -> getString(R.string.peek_empty)
+                    else -> cached
+                }
+            } else {
+                peek.visibility = View.GONE
+            }
+            peekToggle.setOnClickListener {
+                val pos = bindingAdapterPosition
+                if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+                val opening = session.id !in expanded
+                if (opening) expanded.add(session.id) else expanded.remove(session.id)
+                list.adapter?.notifyItemChanged(pos)
+                if (opening && peekText[session.id] == null) fetchPeek(session.id)
+            }
             itemView.setOnClickListener {
                 (activity as MainActivity).showSession(serverId, session.id)
             }

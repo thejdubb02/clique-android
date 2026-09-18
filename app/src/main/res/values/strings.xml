@@ -103,4 +103,8 @@
     <string name="fg_text">Waiting until a session stops working</string>
     <string name="remove_confirm">Remove %1$s? The token on this phone is forgotten. The panel is not touched.</string>
     <string name="delete_confirm">Delete session %1$s? This stops it and forgets the record.</string>
+    <string name="peek_show">show last lines</string>
+    <string name="peek_hide">hide last lines</string>
+    <string name="peek_loading">loading</string>
+    <string name="peek_empty">nothing on screen</string>
 </resources>
