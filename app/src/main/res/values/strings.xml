@@ -60,6 +60,12 @@
     <string name="session_cli">CLI</string>
     <string name="session_folder">Folder</string>
     <string name="create">Create</string>
+    <string name="select_text">Select text</string>
+    <string name="select_text_title">Last %1$d lines</string>
+    <string name="select_text_empty">Nothing there to copy yet</string>
+    <string name="copy_all">Copy all</string>
+    <string name="close">Close</string>
+    <string name="copied_lines">Copied %1$d lines</string>
     <string name="kill">Stop process</string>
     <string name="start">Start</string>
     <string name="delete">Delete</string>

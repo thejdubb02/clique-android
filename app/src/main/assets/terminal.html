@@ -84,6 +84,33 @@
       term.write(bytes);
     };
     window.termFit = reportSize;
+    /* Last n rows ending at the cursor, scrollback included. Read-only:
+       no scroll, no focus, no selection. Mirrors the panel's paneLastLines
+       and TermText.lastLines. */
+    /* The last n rows ending at the cursor, scrollback included, handed back
+       through CliqueBridge as a plain string. Not returned: a value returned
+       from here comes back to Kotlin as a JSON literal that would have to be
+       decoded, and the bridge takes a real String with nothing to escape.
+       Reads the buffer only: no scrolling, no focus, no selection, so asking
+       for the text never moves the pane under someone's finger. */
+    window.termText = (n) => {
+      let out = "";
+      try {
+        n = n | 0;
+        if (term && term.buffer && term.buffer.active && n > 0) {
+          const buf = term.buffer.active;
+          const lines = [];
+          for (let y = buf.baseY + buf.cursorY; y >= 0 && lines.length < n; y--) {
+            const line = buf.getLine(y);
+            lines.unshift(line ? line.translateToString(true) : "");
+          }
+          out = lines.join("\n").replace(/\s+$/, "");
+        }
+      } catch (e) {
+        out = "";
+      }
+      if (window.CliqueBridge) CliqueBridge.onText(out);
+    };
     window.onresize = reportSize;
     setTimeout(() => {
       reportSize();

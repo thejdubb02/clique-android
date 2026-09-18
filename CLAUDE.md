@@ -60,6 +60,37 @@ signal in **under three seconds**. That is why Approve and Deny live on the
 notification rather than only on the session screen. Anything else that acts on
 a waiting session inherits this: do it without opening the session.
 
+## Copying text off the pane
+
+xterm renders to a canvas and its hidden textarea is deliberately inert (that
+inertness is the fix for the Gboard autocorrect bug this app exists to escape),
+so there is no touch selection in the pane and there must not be one. **Do not
+re-enable the textarea or hand-roll touch-to-mouse translation to get it.**
+
+Select text instead lifts the rows into a native `TextView` with
+`setTextIsSelectable(true)`, where Android supplies the handles, the
+Copy/Share/Select-all toolbar and Select all for nothing. Two things learned
+putting it there, both on a device:
+
+- `setHorizontallyScrolling(true)` does **not** survive `setTextIsSelectable`,
+  in either order. The rows wrapped anyway. The width is set outright from the
+  longest row instead, inside a `HorizontalScrollView`.
+- A row that breaks mid-word is usually **tmux**, not the dialog. The shared
+  window is as narrow as the last client to size it, so a phone that attached
+  shrank it. Check the pane itself before chasing a wrapping bug here.
+
+## Testing the part that is JavaScript
+
+`terminal.html` ships inside the app and its logic cannot be reached from a JVM
+unit test. Writing a Kotlin copy of it to test does not count: the copy is not
+what runs, so it can pass while the asset is broken. The same trap applies to
+any "fallback" that only executes when `android.jar` is a stub, because then the
+tested path is the one that never ships.
+
+`tools/terminal_check.js` runs the asset's own functions against a fake xterm
+buffer under node, the way the panel's `tools/frontend_check.js` does. Run it
+after touching `terminal.html`.
+
 ## Where the work is written down
 
 `docs/port-plan.md` for what is left and what is deliberately refused. The

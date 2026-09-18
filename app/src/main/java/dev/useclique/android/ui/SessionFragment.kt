@@ -1,7 +1,11 @@
 package dev.useclique.android.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -16,10 +20,13 @@ import android.view.inputmethod.EditorInfo
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -94,6 +101,12 @@ class SessionFragment : Fragment() {
         toolbar.inflateMenu(R.menu.session)
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.selectText -> {
+                    bridge?.readText(SELECT_TEXT_LINES) { text ->
+                        if (!isAdded) return@readText
+                        showSelectText(text)
+                    }
+                }
                 R.id.kill -> runOp { it.kill(sessionId) }
                 R.id.start -> runOp { it.start(sessionId) }
                 R.id.delete -> confirmDelete(sessionName) {
@@ -299,6 +312,80 @@ class SessionFragment : Fragment() {
         }
     }
 
+    private fun showSelectText(text: String) {
+        if (text.isBlank()) {
+            Toast.makeText(requireContext(), R.string.select_text_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val pad = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            16f,
+            resources.displayMetrics,
+        ).toInt()
+        // The real count, not the cap. A pane that has printed twelve lines
+        // should not be headed "Last 500 lines".
+        val shown = text.split('\n').size
+        val body = TextView(requireContext()).apply {
+            setHorizontallyScrolling(true)
+            this.text = text
+            setTextIsSelectable(true)
+            typeface = Typeface.MONOSPACE
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTextColor(ContextCompat.getColor(context, R.color.text))
+            setPadding(pad, pad, pad, pad)
+            /*
+              A terminal row is already wrapped, to the pane's width. Wrapping
+              it again at the dialog's narrower width breaks every row in two
+              and the output stops being readable: "...model call and re" then
+              "writes the story records". So the rows are kept whole and the
+              view scrolls sideways instead.
+
+              The width is set outright rather than left to
+              setHorizontallyScrolling, which does not survive
+              setTextIsSelectable on this path: tried both orders on a device
+              and the text wrapped either way. Measuring the longest row is
+              deterministic. Capped, because one runaway line should not make a
+              view thousands of columns wide; anything past the cap wraps, as
+              it did before.
+            */
+            val widest = text.lineSequence().maxOfOrNull { it.length } ?: 0
+            width = (paint.measureText("M") * minOf(widest, 400)).toInt() + pad * 2
+        }
+        val wide = HorizontalScrollView(requireContext()).apply {
+            addView(
+                body,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        val scroll = ScrollView(requireContext()).apply {
+            addView(
+                wide,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.select_text_title, shown))
+            .setView(scroll)
+            .setPositiveButton(R.string.copy_all) { _, _ ->
+                val ctx = context ?: return@setPositiveButton
+                val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("terminal", text))
+                Toast.makeText(
+                    ctx,
+                    getString(R.string.copied_lines, shown),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
     private fun runOp(after: () -> Unit = {}, op: (CliqueClient) -> Unit) {
         val act = activity as MainActivity
         val server = act.app.store.get(serverId) ?: return
@@ -325,6 +412,9 @@ class SessionFragment : Fragment() {
 
     companion object {
         private const val ANSWER_QUIET_MS = 6000L
+        // 500 is a cap: the buffer holds 8000 and a selectable TextView
+        // holding all of it is slow to select in.
+        private const val SELECT_TEXT_LINES = 500
         private const val ARG_SERVER = "serverId"
         private const val ARG_SESSION = "sessionId"
 

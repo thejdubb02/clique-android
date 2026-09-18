@@ -31,11 +31,16 @@ class TerminalBridge(
     private val main = Handler(Looper.getMainLooper())
     private var socket: WebSocket? = null
     private val ready = AtomicBoolean(false)
+    private val attached = AtomicBoolean(false)
     private var lastCols = 80
     private var lastRows = 24
+
+    /** Whoever asked for the pane's text and has not been answered yet. Main thread only. */
+    private var pendingText: ((String) -> Unit)? = null
     private var opened = false
 
     fun attach() {
+        attached.set(true)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = false
@@ -56,6 +61,7 @@ class TerminalBridge(
     }
 
     fun detach() {
+        attached.set(false)
         release()
         socket?.close(1000, "bye")
         socket = null
@@ -73,6 +79,47 @@ class TerminalBridge(
 
     fun hold() {
         sendControl(JSONObject().put("type", "hold"))
+    }
+
+    /**
+     * Last [lines] rows of pane text, scrollback included, ending at the
+     * cursor. The callback runs on the main thread. Does nothing if this
+     * bridge has already been detached.
+     */
+    /**
+     * The pane's text, for something that can select it.
+     *
+     * The page hands it back through CliqueBridge rather than through
+     * evaluateJavascript's return value. That return value is a JSON literal,
+     * so taking it would mean decoding one, and the decoder that runs on a
+     * phone is not the decoder a JVM unit test can reach: android.jar is a stub
+     * there, so the tested path would be a fallback that never ships. A
+     * @JavascriptInterface parameter is a plain String and there is nothing to
+     * encode or decode at all.
+     *
+     * Answered once. If the page never calls back, the callback still fires
+     * with nothing after a moment, because a menu item that silently does
+     * nothing is the worst of the available failures.
+     */
+    fun readText(lines: Int, onText: (String) -> Unit) {
+        val n = lines.coerceAtLeast(0)
+        main.post {
+            if (!attached.get()) return@post
+            pendingText = onText
+            try {
+                webView.evaluateJavascript("window.termText && window.termText($n)", null)
+            } catch (_: Exception) {
+                deliverText("")
+            }
+            main.postDelayed({ if (pendingText === onText) deliverText("") }, 1500)
+        }
+    }
+
+    /** Fires the pending reader once and clears it, so nothing answers twice. */
+    private fun deliverText(text: String) {
+        val waiting = pendingText ?: return
+        pendingText = null
+        if (attached.get()) waiting(text)
     }
 
     fun resize(cols: Int, rows: Int) {
@@ -166,6 +213,11 @@ class TerminalBridge(
         @JavascriptInterface
         fun onSize(cols: Int, rows: Int) {
             main.post { resize(cols, rows) }
+        }
+
+        @JavascriptInterface
+        fun onText(text: String?) {
+            main.post { deliverText(text ?: "") }
         }
     }
 }

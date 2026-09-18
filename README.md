@@ -27,7 +27,7 @@ sideloaded a build: `docs/fdroid-repo.md`.
 
 1. **Servers** — add, edit, remove. Reachability from `GET /healthz`.
 2. **Sessions** — Running first, then Ungrouped, then folders, then Archived, matching the web sidebar; pinned float. Opens on running sessions only, with a toolbar toggle for all and a search over name, directory and branch. A typed search overrides the filter, because the session you are looking for is often a stopped one. Pull to refresh; polls every 3s while visible.
-3. **Session** — terminal in a WebView, native prompt bar pinned above the keyboard with WindowInsets. Send button, and Enter sends (Shift+Enter for a newline). A key bar above the prompt sends one bare tmux key: Esc, ^C, Tab, up, down, Enter.
+3. **Session** — terminal in a WebView, native prompt bar pinned above the keyboard with WindowInsets. Send button, and Enter sends (Shift+Enter for a newline). A key bar above the prompt sends one bare tmux key: Esc, ^C, Tab, up, down, Enter. **Select text** in the overflow menu lifts the last 500 rows into an ordinary Android text box, so the output can be selected with the usual handles and copied, shared or copied whole. The pane itself stays untouchable on purpose: xterm's hidden input field is what Android keyboards fight, and it stays inert.
 4. **Notification** when a session that was working stops, from `GET /api/sessions/<id>/wait`. When it stopped to ask permission, that notification carries Approve and Deny, which send `Enter` and `Escape` without opening the app. That indirection is the point: opening a session attaches a tmux client, the pane repaints, and the panel reads output-after-a-signal as the session having carried on, so the signal is gone in under three seconds.
 
 ## Foreground service
