@@ -70,6 +70,55 @@
         lockTextarea();
       }
     });
+    /* How many whole rows a drag has earned, and what is left over. Pure, so
+       tools/terminal_check.js can cover the arithmetic without a browser. */
+    window.termScrollStep = (accumPx, rowPx) => {
+      if (!(rowPx > 0)) return { lines: 0, rest: accumPx };
+      const lines = Math.trunc(accumPx / rowPx);
+      return { lines: lines, rest: accumPx - lines * rowPx };
+    };
+
+    /* Touch scrolling, which xterm does not do for us.
+     *
+     * xterm draws .xterm-screen on top of .xterm-viewport, so a finger lands
+     * on the screen, and the nearest scrollable ancestor of that is body,
+     * which is overflow:hidden. On a desktop the pane still scrolls, because
+     * xterm listens for wheel events and moves the buffer itself. A touch
+     * produces no wheel, so nothing translated the gesture and the pane would
+     * not move at all: measured on a device with 300 lines of output, a flick
+     * and a slow drag, and byte-identical screenshots either way.
+     *
+     * One finger, one row per row-height dragged, no momentum. Predictable
+     * beats clever on a pane someone is trying to read. Dragging down goes
+     * back through the scrollback, the way a page does. */
+    (() => {
+      const el = term.element || document.getElementById('term');
+      if (!el) return;
+      let lastY = null;
+      let accum = 0;
+      const rowPx = () => {
+        const h = el.clientHeight;
+        return term.rows > 0 && h > 0 ? h / term.rows : 0;
+      };
+      const stop = () => { lastY = null; accum = 0; };
+      el.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return stop();
+        lastY = e.touches[0].clientY;
+        accum = 0;
+      }, { passive: true });
+      el.addEventListener('touchmove', (e) => {
+        if (lastY === null || e.touches.length !== 1) return;
+        const y = e.touches[0].clientY;
+        accum += lastY - y;
+        lastY = y;
+        const step = window.termScrollStep(accum, rowPx());
+        accum = step.rest;
+        if (step.lines !== 0) term.scrollLines(step.lines);
+      }, { passive: true });
+      el.addEventListener('touchend', stop, { passive: true });
+      el.addEventListener('touchcancel', stop, { passive: true });
+    })();
+
     const reportSize = () => {
       fit.fit();
       lockTextarea();

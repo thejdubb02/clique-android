@@ -97,6 +97,25 @@ console.log("the pane's text, for something that can select it");
         runTermText({ buffer: null }, 10) === "");
 }
 
+console.log("a drag turns into whole rows");
+{
+  const body = extract(html, "termScrollStep");
+  // The page assigns onto `window`, which does not exist in a bare Function,
+  // so one is passed in and the assignment read back off it.
+  const s = new Function("window", body + "\nreturn window.termScrollStep;")({});
+  check("a tap earns no rows", s(0, 17).lines === 0);
+  check("and neither does a twitch shorter than a row",
+        s(16, 17).lines === 0 && s(16, 17).rest === 16, s(16, 17));
+  check("exactly one row scrolls one row",
+        s(17, 17).lines === 1 && s(17, 17).rest === 0, s(17, 17));
+  check("the remainder is carried, not thrown away",
+        s(20, 17).lines === 1 && s(20, 17).rest === 3, s(20, 17));
+  check("dragging the other way scrolls back",
+        s(-20, 17).lines === -1 && s(-20, 17).rest === -3, s(-20, 17));
+  check("a row height of zero cannot divide by zero",
+        s(50, 0).lines === 0 && s(50, 0).rest === 50, s(50, 0));
+}
+
 /* The pane must not move because somebody asked to read it. */
 console.log("reading the pane does not disturb it");
 {
