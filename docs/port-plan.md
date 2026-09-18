@@ -50,6 +50,7 @@ every other CLI here ask questions, and the answer is usually a keystroke.
 
 | | Endpoint | Note |
 |---|---|---|
+| **Clickable links and paths** | none | The pane is xterm here too, but nothing registers a link provider, so a URL, a bare host like `fdroid.useclique.dev/repo` and a file path the agent printed are all inert text. The panel gained the scheme-less case on 2026-09-18 and the phone did not: the matching is pure JavaScript in `app.js` and could be lifted into `terminal.html` rather than written twice. Opening a path needs somewhere to show it, which the app has no equivalent of yet |
 | **Peek** | `GET /api/sessions/<id>/peek?lines=8` | The last few lines that actually said something, under each row. Built for exactly this question and currently unused by the app |
 | **Prompt history** | `GET /api/prompts?limit=400` | Re-sending a prompt you already wrote beats typing it on glass |
 | **Drafts** | `sessions[].draft`, `PATCH` | A half-typed prompt survives to the laptop and back. The panel already syncs these; the app throws them away |
