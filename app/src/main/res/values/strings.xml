@@ -68,6 +68,10 @@
     <string name="copied_lines">Copied %1$d lines</string>
     <string name="kill">Stop process</string>
     <string name="start">Start</string>
+    <string name="interrupt">Interrupt</string>
+    <string name="rename">Rename</string>
+    <string name="rename_empty">Enter a name.</string>
+    <string name="move_to_folder">Move to folder</string>
     <string name="delete">Delete</string>
     <string name="refresh">Refresh</string>
     <string name="working">working</string>

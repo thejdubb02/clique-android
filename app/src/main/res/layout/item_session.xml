@@ -44,4 +44,52 @@
         android:layout_marginTop="4dp"
         android:textColor="@color/muted"
         android:textSize="13sp" />
+
+    <!--
+      Approve and Deny on the row itself. Opening the session attaches a
+      tmux client and clears the waiting signal, so these cannot live only
+      on the session screen or behind a long press.
+    -->
+    <LinearLayout
+        android:id="@+id/permission_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:importantForAccessibility="no"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/permission_approve"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:background="@drawable/btn_accent"
+            android:text="@string/approve"
+            android:textAllCaps="false"
+            android:textColor="@color/ink" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/permission_deny"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:background="@drawable/field_bg"
+            android:text="@string/deny"
+            android:textAllCaps="false"
+            android:textColor="@color/error" />
+    </LinearLayout>
 </LinearLayout>

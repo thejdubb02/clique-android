@@ -76,6 +76,22 @@ class CliqueClient(
         authed("api/sessions/$sessionId/send").post(payload)
     }
 
+    fun updateSession(
+        sessionId: String,
+        name: String? = null,
+        folder: String? = null,
+        clearFolder: Boolean = false,
+    ) {
+        // Only the fields given. `"folder": null` is Ungrouped; omitting
+        // folder leaves it where it is, which is why [clearFolder] is
+        // separate from [folder] being absent.
+        val payload = JSONObject()
+        if (name != null) payload.put("name", name)
+        if (clearFolder) payload.put("folder", JSONObject.NULL)
+        else if (folder != null) payload.put("folder", folder)
+        authed("api/sessions/$sessionId").patch(payload.toString())
+    }
+
     fun createSession(cli: String, cwd: String, name: String, folder: String?): String {
         val payload = JSONObject()
             .put("cli", cli)
@@ -155,6 +171,9 @@ class CliqueClient(
 
         fun post(json: String, expected: Int? = null): String =
             execute(builder.post(json.toRequestBody(JSON)).build(), expected)
+
+        fun patch(json: String, expected: Int? = null): String =
+            execute(builder.patch(json.toRequestBody(JSON)).build(), expected)
 
         fun delete(): String = execute(builder.delete().build())
     }

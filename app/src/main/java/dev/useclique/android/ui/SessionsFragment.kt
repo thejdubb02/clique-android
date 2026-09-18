@@ -5,10 +5,14 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -32,6 +36,8 @@ import dev.useclique.android.api.PanelState
 import dev.useclique.android.api.Session
 import dev.useclique.android.api.SessionListItem
 import dev.useclique.android.api.groupSessions
+import dev.useclique.android.api.parseFolderColor
+import dev.useclique.android.api.wantsPermission
 
 class SessionsFragment : Fragment() {
 
@@ -44,6 +50,12 @@ class SessionsFragment : Fragment() {
     private var lastState: PanelState? = null
     private var query: String = ""
     private var activeOnly: Boolean = true
+    /*
+      Same quiet window as SessionFragment. The poll is every three seconds,
+      so an answered prompt can still read as waiting on the next pass and
+      put the buttons back under a thumb that is still there.
+    */
+    private val answeredUntil = HashMap<String, Long>()
     private val handler = Handler(Looper.getMainLooper())
     private val poll = object : Runnable {
         override fun run() {
@@ -190,9 +202,12 @@ class SessionsFragment : Fragment() {
         lastState = state
         items.clear()
         val folderNames = state.folders.associate { it.id to it.name }
+        val folderColors = state.folders.associate { it.id to it.color }
         for (item in groupSessions(state.sessions, state.folders, query, activeOnly)) {
             when (item) {
-                is SessionListItem.Header -> items.add(Item.Header(headerTitle(item.id, folderNames)))
+                is SessionListItem.Header -> items.add(
+                    Item.Header(headerTitle(item.id, folderNames), folderColors[item.id]),
+                )
                 is SessionListItem.Row -> items.add(Item.Row(item.session))
             }
         }
@@ -220,7 +235,7 @@ class SessionsFragment : Fragment() {
     }
 
     private sealed class Item {
-        data class Header(val title: String) : Item()
+        data class Header(val title: String, val color: String? = null) : Item()
         data class Row(val session: Session) : Item()
     }
 
@@ -242,14 +257,28 @@ class SessionsFragment : Fragment() {
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             when (val item = items[position]) {
-                is Item.Header -> (holder as HeaderHolder).title.text = item.title
+                is Item.Header -> (holder as HeaderHolder).bind(item.title, item.color)
                 is Item.Row -> (holder as RowHolder).bind(item.session)
             }
         }
     }
 
     private class HeaderHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val title: TextView = view.findViewById(R.id.title)
+        private val title: TextView = view.findViewById(R.id.title)
+        private val colorDot: View = view.findViewById(R.id.folder_color)
+
+        fun bind(titleText: String, rawColor: String?) {
+            title.text = titleText
+            val fallback = ContextCompat.getColor(itemView.context, R.color.muted)
+            val color = parseFolderColor(rawColor, fallback)
+            if (rawColor.isNullOrBlank()) {
+                colorDot.visibility = View.GONE
+            } else {
+                colorDot.visibility = View.VISIBLE
+                val bg = colorDot.background?.mutate()
+                if (bg is GradientDrawable) bg.setColor(color) else colorDot.setBackgroundColor(color)
+            }
+        }
     }
 
     private inner class RowHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -257,6 +286,9 @@ class SessionsFragment : Fragment() {
         val cli: TextView = view.findViewById(R.id.cli)
         val meta: TextView = view.findViewById(R.id.meta)
         val dot: View = view.findViewById(R.id.dot)
+        val actions: View = view.findViewById(R.id.permission_actions)
+        val approve: View = view.findViewById(R.id.permission_approve)
+        val deny: View = view.findViewById(R.id.permission_deny)
 
         fun bind(session: Session) {
             name.text = session.name
@@ -274,6 +306,10 @@ class SessionsFragment : Fragment() {
             val c = ContextCompat.getColor(itemView.context, color)
             val bg = dot.background?.mutate()
             if (bg is GradientDrawable) bg.setColor(c) else dot.setBackgroundColor(c)
+            val quiet = System.currentTimeMillis() < (answeredUntil[session.id] ?: 0L)
+            actions.visibility = if (!quiet && wantsPermission(session)) View.VISIBLE else View.GONE
+            approve.setOnClickListener { answerFromList(session, "Enter", actions) }
+            deny.setOnClickListener { answerFromList(session, "Escape", actions) }
             itemView.setOnClickListener {
                 (activity as MainActivity).showSession(serverId, session.id)
             }
@@ -284,20 +320,85 @@ class SessionsFragment : Fragment() {
         }
     }
 
+    private fun answerFromList(session: Session, key: String, actions: View) {
+        if (actions.visibility != View.VISIBLE) return
+        answeredUntil[session.id] = System.currentTimeMillis() + ANSWER_QUIET_MS
+        actions.visibility = View.GONE
+        runOp { it.sendKey(session.id, key) }
+    }
+
     private fun showActions(session: Session) {
         val options = mutableListOf<String>()
+        if (session.alive) options.add(getString(R.string.interrupt))
         if (session.alive) options.add(getString(R.string.kill)) else options.add(getString(R.string.start))
+        options.add(getString(R.string.rename))
+        options.add(getString(R.string.move_to_folder))
         options.add(getString(R.string.delete))
         AlertDialog.Builder(requireContext())
             .setTitle(session.name)
             .setItems(options.toTypedArray()) { _, which ->
                 val label = options[which]
                 when (label) {
+                    getString(R.string.interrupt) -> runOp { it.sendKey(session.id, "C-c") }
                     getString(R.string.kill) -> runOp { it.kill(session.id) }
                     getString(R.string.start) -> runOp { it.start(session.id) }
+                    getString(R.string.rename) -> showRename(session)
+                    getString(R.string.move_to_folder) -> showMove(session)
                     getString(R.string.delete) -> confirmDelete(session.name) {
                         runOp { it.delete(session.id) }
                     }
+                }
+            }
+            .show()
+    }
+
+    private fun showRename(session: Session) {
+        val pad = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            16f,
+            resources.displayMetrics,
+        ).toInt()
+        val input = EditText(requireContext()).apply {
+            setText(session.name)
+            setSelection(session.name.length)
+            hint = getString(R.string.session_name)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setTextColor(ContextCompat.getColor(context, R.color.text))
+            setHintTextColor(ContextCompat.getColor(context, R.color.hint))
+            background = ContextCompat.getDrawable(context, R.drawable.field_bg)
+            setPadding(pad, pad / 2, pad, pad / 2)
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+        val box = FrameLayout(requireContext()).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.rename)
+            .setView(box)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.rename) { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isEmpty()) {
+                    Toast.makeText(requireContext(), R.string.rename_empty, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                runOp { it.updateSession(session.id, name = newName) }
+            }
+            .show()
+    }
+
+    private fun showMove(session: Session) {
+        val folders = lastState?.folders ?: emptyList()
+        val labels = mutableListOf(getString(R.string.ungrouped))
+        labels.addAll(folders.map { it.name })
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.move_to_folder)
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == 0) {
+                    runOp { it.updateSession(session.id, clearFolder = true) }
+                } else {
+                    runOp { it.updateSession(session.id, folder = folders[which - 1].id) }
                 }
             }
             .show()
@@ -321,6 +422,7 @@ class SessionsFragment : Fragment() {
         private const val ARG_SERVER = "serverId"
         private const val PREFS = "session_list"
         private const val KEY_ACTIVE_ONLY = "active_only"
+        private const val ANSWER_QUIET_MS = 6000L
         fun newInstance(serverId: String) = SessionsFragment().apply {
             arguments = Bundle().apply { putString(ARG_SERVER, serverId) }
         }
