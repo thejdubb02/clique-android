@@ -9,7 +9,7 @@ Everything here already exists server-side and is documented in
 unless it says so, which is the point: **the API is the whole surface**, so a
 port is a UI job, not a protocol job.
 
-Status as of 0.2.0, 2026-09-18.
+Status as of 0.2.1, 2026-09-18.
 
 The app ships from our own F-Droid repository at https://fdroid.useclique.dev,
 so a release reaches a phone as an ordinary update notification. Cutting one is
@@ -50,7 +50,8 @@ every other CLI here ask questions, and the answer is usually a keystroke.
 
 | | Endpoint | Note |
 |---|---|---|
-| **Clickable links and paths** | none | The pane is xterm here too, but nothing registers a link provider, so a URL, a bare host like `fdroid.useclique.dev/repo` and a file path the agent printed are all inert text. The panel gained the scheme-less case on 2026-09-18 and the phone did not: the matching is pure JavaScript in `app.js` and could be lifted into `terminal.html` rather than written twice. Opening a path needs somewhere to show it, which the app has no equivalent of yet |
+| ~~**Clickable links**~~ | none | Done in 0.2.1 for URLs. The matching is lifted from the panel's `app.js` rather than written twice: `LINK_RE`, `BARE_RE`, `trimUrl` and the wrap helpers all came across, so a host with no scheme and a URL split across two rows both work, and `tools/terminal_check.js` covers them. A tap opens the phone's browser, with the scheme checked again in Kotlin because remote output reaching `ACTION_VIEW` is a way to launch another app. **Paths are still inert**: a path needs somewhere to show it and there is no file view here. **And a link is not visibly a link until it is touched**, because xterm only draws the underline on hover and a phone has none. That is its own row below |
+| **A link has to look like a link** | none | xterm draws a link's underline on hover and a phone has no hover, so a URL in the pane is tappable but indistinguishable from the text around it. Nothing in the app says it is there. The repo's own rule is that nothing lives only behind hover, which makes this a defect rather than a nicety. Options, none of them settled: an absolutely positioned overlay drawn from the same cell coordinates the link provider already computes, Linkify on the Select text view, or a list of the links on screen in the overflow menu |
 | **Peek** | `GET /api/sessions/<id>/peek?lines=8` | The last few lines that actually said something, under each row. Built for exactly this question and currently unused by the app |
 | **Prompt history** | `GET /api/prompts?limit=400` | Re-sending a prompt you already wrote beats typing it on glass |
 | **Drafts** | `sessions[].draft`, `PATCH` | A half-typed prompt survives to the laptop and back. The panel already syncs these; the app throws them away |

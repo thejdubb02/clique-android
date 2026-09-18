@@ -86,6 +86,7 @@
     <string name="pair_need_code">Enter the code from the panel.</string>
     <string name="pair_ok">Paired.</string>
     <string name="send_failed">Could not send.</string>
+    <string name="url_cannot_open">Nothing on this phone can open it.</string>
     <string name="load_failed">Could not load sessions.</string>
     <string name="create_failed">Could not create the session.</string>
     <string name="no_clis">No installed CLIs reported by this panel.</string>

@@ -1,11 +1,14 @@
 package dev.useclique.android.ui
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -37,6 +40,7 @@ import dev.useclique.android.MainActivity
 import dev.useclique.android.R
 import dev.useclique.android.api.CliqueClient
 import dev.useclique.android.api.Session
+import dev.useclique.android.api.openableUrl
 import dev.useclique.android.api.wantsPermission
 import dev.useclique.android.notify.WaitService
 import dev.useclique.android.term.TerminalBridge
@@ -160,7 +164,10 @@ class SessionFragment : Fragment() {
         web.isFocusable = false
         web.isFocusableInTouchMode = false
         val client = CliqueClient.forServer(server, token)
-        bridge = TerminalBridge(web, client, sessionId).also { it.attach() }
+        bridge = TerminalBridge(web, client, sessionId).also {
+            it.onOpenUrl = { url -> if (isAdded) openUrl(url) }
+            it.attach()
+        }
 
         refreshState()
         maybeAskNotifications()
@@ -265,6 +272,15 @@ class SessionFragment : Fragment() {
                 marginEnd = pad
             }
             row.addView(btn, lp)
+        }
+    }
+
+    private fun openUrl(url: String) {
+        val safe = openableUrl(url) ?: return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safe)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), R.string.url_cannot_open, Toast.LENGTH_SHORT).show()
         }
     }
 

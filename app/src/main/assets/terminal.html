@@ -160,6 +160,175 @@
       }
       if (window.CliqueBridge) CliqueBridge.onText(out);
     };
+
+    /* Clickable URLs in the pane. Lifted from the panel rather than a
+     * second matcher that would drift. The wrap helpers exist because
+     * xterm only asks about one row at a time. Assigned onto window so
+     * tools/terminal_check.js can pull them out. Only http and https:
+     * the pane is remote output, so javascript: and file: stay text. */
+    const LINK_RE = /\bhttps?:\/\/[^\s"'`<>]+/g;
+
+    /* A URL that wraps is still one URL. xterm only asks about one row at a
+     * time, so without this a login link split at column 80 is two dead halves. */
+    function paneLineWrapped(term, row0) {
+      try {
+        const line = term.buffer.active.getLine(row0);
+        if (line && typeof line.isWrapped === "boolean") return line.isWrapped;
+      } catch (err) { /* older buffer */ }
+      return false;
+    }
+
+    function paneWrapParts(term, lineNumber) {
+      const buf = term.buffer.active;
+      let start = lineNumber - 1;
+      while (start > 0 && paneLineWrapped(term, start)) start--;
+      const parts = [];
+      let y = start;
+      while (y < buf.length) {
+        const line = buf.getLine(y);
+        if (!line) break;
+        if (y > start && !paneLineWrapped(term, y)) break;
+        parts.push({ y: y + 1, text: line.translateToString(true) });
+        y++;
+      }
+      if (!parts.length) {
+        const line = buf.getLine(lineNumber - 1);
+        parts.push({ y: lineNumber, text: line ? line.translateToString(true) : "" });
+      }
+      return parts;
+    }
+
+    function paneRowsText(parts) {
+      return parts.map((p) => p.text).join("");
+    }
+
+    function paneUrlSegments(parts, start, length) {
+      const end = start + length;
+      let offset = 0;
+      const segs = [];
+      for (const part of parts) {
+        const a = Math.max(start, offset);
+        const b = Math.min(end, offset + part.text.length);
+        if (b > a) {
+          segs.push({ y: part.y, x0: a - offset + 1, x1: b - offset });
+        }
+        offset += part.text.length;
+      }
+      return segs;
+    }
+
+    /* A host and path with no scheme, the way our own output prints one:
+     * "fdroid.useclique.dev/repo". The slash is not optional. Without it a domain
+     * cannot be told apart from a filename, and .md, .sh, .pl, .zip and .mov are
+     * all real top-level domains, so README.md would have become a link.
+     *
+     * The character before it has to be a space, a quote or an opening bracket.
+     * That is what keeps /root/.claude/x, user@host.com/y and the tail of a real
+     * https:// URL out: each of those has a slash, a dot or a letter in front. */
+    const BARE_RE = /(?:^|[\s"'`=(\[<])((?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,24}\/[^\s"'`<>]*)/g;
+
+    /* Trailing punctuation almost always belongs to the sentence, not the URL:
+     * "see https://example.com/docs." and "(https://example.com)". Brackets are
+     * only trimmed when unbalanced, so a Wikipedia URL ending in ")" survives.
+     *
+     * Checked against, in order: a URL ending a sentence, one wrapped in
+     * parentheses, /wiki/Foo_(bar), a query string with &, one followed by a
+     * comma, and javascript: and file:, which must not match at all. */
+    function trimUrl(text) {
+      let out = text;
+      while (out.length > 1) {
+        const last = out[out.length - 1];
+        if (".,;:!?'\"".includes(last)) { out = out.slice(0, -1); continue; }
+        if (last === ")" && (out.match(/\(/g) || []).length < (out.match(/\)/g) || []).length) {
+          out = out.slice(0, -1); continue;
+        }
+        if (last === "]" && (out.match(/\[/g) || []).length < (out.match(/]/g) || []).length) {
+          out = out.slice(0, -1); continue;
+        }
+        break;
+      }
+      return out;
+    }
+
+    /* Where the captured host starts in the joined line. Named for the panel's
+     * copy, which also uses it for file paths; this app has no file view, so
+     * paths stay text and only the host half came across. */
+    function pathRange(line, full, captured) {
+      const start = line.indexOf(captured, Math.max(0, full.index));
+      const at = start >= 0 ? start : full.index + (full[0].length - captured.length);
+      return { start: at + 1, end: at + captured.length };
+    }
+
+    /* Every scheme-less host+path on one wrapped line, as per-row segments.
+     * The scheme is put on here rather than at the tap, because the pane text
+     * carries none and only http and https are ever opened.
+     *
+     * Pure, so it can be tested without a terminal: tools/terminal_check.js. */
+    function paneBareLinks(parts, lineNumber) {
+      const text = paneRowsText(parts);
+      const out = [];
+      BARE_RE.lastIndex = 0;
+      let match;
+      while ((match = BARE_RE.exec(text)) !== null) {
+        const raw = trimUrl(match[1]);
+        if (!raw) continue;
+        const at = pathRange(text, match, raw);
+        for (const seg of paneUrlSegments(parts, at.start - 1, raw.length)) {
+          if (seg.y !== lineNumber) continue;
+          out.push({ url: "https://" + raw, x0: seg.x0, x1: seg.x1, y: seg.y });
+        }
+      }
+      return out;
+    }
+
+    window.LINK_RE = LINK_RE;
+    window.BARE_RE = BARE_RE;
+    window.trimUrl = trimUrl;
+    window.paneLineWrapped = paneLineWrapped;
+    window.paneWrapParts = paneWrapParts;
+    window.paneRowsText = paneRowsText;
+    window.paneUrlSegments = paneUrlSegments;
+    window.paneBareLinks = paneBareLinks;
+    window.termLinks = function(parts, lineNumber) {
+      const text = paneRowsText(parts);
+      const links = [];
+      LINK_RE.lastIndex = 0;
+      let match;
+      while ((match = LINK_RE.exec(text)) !== null) {
+        const url = trimUrl(match[0]);
+        if (!url) continue;
+        for (const seg of paneUrlSegments(parts, match.index, url.length)) {
+          if (seg.y !== lineNumber) continue;
+          links.push({ url: url, x0: seg.x0, x1: seg.x1, y: seg.y });
+        }
+      }
+      for (const hit of paneBareLinks(parts, lineNumber)) links.push(hit);
+      return links;
+    };
+
+    if (term.registerLinkProvider) {   // older core: links simply stay text
+      term.registerLinkProvider({
+        provideLinks(lineNumber, callback) {
+          const line = term.buffer.active.getLine(lineNumber - 1);
+          if (!line) return callback(undefined);
+          const parts = paneWrapParts(term, lineNumber);
+          const links = [];
+          for (const hit of window.termLinks(parts, lineNumber)) {
+            links.push({
+              // xterm columns are 1-based and the end is inclusive.
+              range: { start: { x: hit.x0, y: hit.y },
+                       end: { x: hit.x1, y: hit.y } },
+              text: hit.url,
+              decorations: { underline: true, pointerCursor: true },
+              activate(event, uri) {
+                window.CliqueBridge && CliqueBridge.onUrl(uri);
+              },
+            });
+          }
+          callback(links);
+        },
+      });
+    }
     window.onresize = reportSize;
     setTimeout(() => {
       reportSize();

@@ -39,6 +39,9 @@ class TerminalBridge(
     private var pendingText: ((String) -> Unit)? = null
     private var opened = false
 
+    /** A URL the pane asked to open. The bridge does not know what an Intent is. */
+    var onOpenUrl: ((String) -> Unit)? = null
+
     fun attach() {
         attached.set(true)
         webView.settings.apply {
@@ -218,6 +221,15 @@ class TerminalBridge(
         @JavascriptInterface
         fun onText(text: String?) {
             main.post { deliverText(text ?: "") }
+        }
+
+        @JavascriptInterface
+        fun onUrl(url: String?) {
+            main.post {
+                if (!attached.get()) return@post
+                val u = url ?: return@post
+                onOpenUrl?.invoke(u)
+            }
         }
     }
 }

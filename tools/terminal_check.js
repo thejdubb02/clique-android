@@ -125,6 +125,57 @@ console.log("reading the pane does not disturb it");
   }
 }
 
+/* The asset's own matcher, not a copy. Helpers close over each other, so
+ * they have to come out as one region rather than one extract() each. */
+function loadTermLinks() {
+  const start = html.indexOf("const LINK_RE =");
+  const end = html.indexOf("if (term.registerLinkProvider)");
+  if (start < 0 || end < 0 || end <= start) throw new Error("no termLinks region");
+  return new Function("window", html.slice(start, end) + "\nreturn window.termLinks;")({});
+}
+
+console.log("URLs the pane printed");
+{
+  const termLinks = loadTermLinks();
+  const row = (text, y) => termLinks([{ y: y || 1, text: text }], y || 1);
+
+  const abs = row("see https://example.com/docs");
+  check("an absolute https URL is a link",
+        abs.length === 1 && abs[0].url === "https://example.com/docs", abs);
+
+  const bare = row("repo at fdroid.useclique.dev/repo");
+  check("a scheme-less host gets https:// added",
+        bare.length === 1 && bare[0].url === "https://fdroid.useclique.dev/repo", bare);
+
+  const parts = [
+    { y: 1, text: "https://example.com/foo/ba" },
+    { y: 2, text: "r/baz" },
+  ];
+  const first = termLinks(parts, 1);
+  const second = termLinks(parts, 2);
+  const whole = "https://example.com/foo/bar/baz";
+  check("a wrapped URL is a link on the first row", first.length === 1, first);
+  check("and on the second", second.length === 1, second);
+  check("both rows carry the whole URL",
+        first[0] && second[0] && first[0].url === whole && second[0].url === whole,
+        [first, second]);
+  check("the first row's slice is that row",
+        first[0] && first[0].x0 === 1 && first[0].x1 === 26 && first[0].y === 1, first);
+  check("the second row's slice is the remainder",
+        second[0] && second[0].x0 === 1 && second[0].x1 === 5 && second[0].y === 2, second);
+
+  const period = row("see https://example.com/docs.");
+  check("a trailing period is left to the sentence",
+        period.length === 1 && period[0].url === "https://example.com/docs", period);
+
+  check("README.md is not a link", row("edit README.md now").length === 0,
+        row("edit README.md now"));
+  check("a row with no links is empty", row("hello world").length === 0);
+
+  check("termLinks is on the page the way termText is",
+        extract(html, "termLinks").indexOf("window.termLinks") === 0);
+}
+
 console.log("");
 console.log(failed ? `FAILED ${failed}` : "all passed");
 process.exit(failed ? 1 : 0);
