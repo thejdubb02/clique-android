@@ -126,12 +126,17 @@ console.log("reading the pane does not disturb it");
 }
 
 /* The asset's own matcher, not a copy. Helpers close over each other, so
- * they have to come out as one region rather than one extract() each. */
-function loadTermLinks() {
+ * they have to come out as one region rather than one extract() each.
+ * paneWrapPartsFrom and termVisibleLinks live in the same slice. */
+function loadLinkRegion() {
   const start = html.indexOf("const LINK_RE =");
   const end = html.indexOf("if (term.registerLinkProvider)");
   if (start < 0 || end < 0 || end <= start) throw new Error("no termLinks region");
-  return new Function("window", html.slice(start, end) + "\nreturn window.termLinks;")({});
+  return new Function("window", html.slice(start, end) + "\nreturn window;")({});
+}
+
+function loadTermLinks() {
+  return loadLinkRegion().termLinks;
 }
 
 console.log("URLs the pane printed");
@@ -174,6 +179,80 @@ console.log("URLs the pane printed");
 
   check("termLinks is on the page the way termText is",
         extract(html, "termLinks").indexOf("window.termLinks") === 0);
+}
+
+console.log("underlines for URLs you can see");
+{
+  const win = loadLinkRegion();
+  const termVisibleLinks = win.termVisibleLinks;
+  check("termVisibleLinks came out of the page", typeof termVisibleLinks === "function");
+  check("termVisibleLinks is on the page the way termText is",
+        extract(html, "termVisibleLinks").indexOf("window.termVisibleLinks") === 0);
+
+  const readRows = (rows) => (n) => rows[n - 1] || null;
+
+  const one = termVisibleLinks(
+    readRows([{ text: "see https://example.com/docs", wrapped: false }]),
+    1, 1);
+  check("a row with one URL yields one span with the right y, x0, x1 and url",
+        one.length === 1
+          && one[0].y === 1 && one[0].x0 === 5 && one[0].x1 === 28
+          && one[0].url === "https://example.com/docs",
+        one);
+
+  const none = termVisibleLinks(
+    readRows([{ text: "hello world", wrapped: false }]),
+    1, 1);
+  check("a row with no URL yields nothing", none.length === 0, none);
+
+  const wrapRows = [
+    { text: "https://example.com/foo/ba", wrapped: false },
+    { text: "r/baz", wrapped: true },
+  ];
+  const wrapped = termVisibleLinks(readRows(wrapRows), 1, 2);
+  const whole = "https://example.com/foo/bar/baz";
+  check("a URL wrapped over two rows yields one span on each row",
+        wrapped.length === 2, wrapped);
+  check("each wrapped row carries the whole URL",
+        wrapped[0] && wrapped[1]
+          && wrapped[0].url === whole && wrapped[1].url === whole
+          && wrapped[0].y === 1 && wrapped[0].x0 === 1 && wrapped[0].x1 === 26
+          && wrapped[1].y === 2 && wrapped[1].x0 === 1 && wrapped[1].x1 === 5,
+        wrapped);
+
+  let threw = false;
+  let nullGot;
+  try {
+    nullGot = termVisibleLinks(() => null, 1, 4);
+  } catch (e) {
+    threw = true;
+    nullGot = String(e);
+  }
+  check("readRow returning null for a line does not throw",
+        !threw && Array.isArray(nullGot) && nullGot.length === 0, nullGot);
+
+  const around = [
+    { text: "https://example.com/a", wrapped: false },
+    { text: "hello", wrapped: false },
+    { text: "https://other.example/z", wrapped: false },
+  ];
+  const mid = termVisibleLinks(readRows(around), 2, 2);
+  check("lines outside from..to are not returned",
+        mid.length === 0, mid);
+
+  const wrapMid = termVisibleLinks(readRows([
+    { text: "https://example.com/foo/ba", wrapped: false },
+    { text: "r/baz", wrapped: true },
+    { text: "https://other.example/z", wrapped: false },
+  ]), 2, 2);
+  check("a wrap that starts above the viewport still only returns visible rows",
+        wrapMid.length === 1 && wrapMid[0].y === 2
+          && wrapMid[0].url === whole, wrapMid);
+
+  const keys = wrapped.map((s) => s.y + ":" + s.x0 + ":" + s.x1);
+  const uniq = keys.filter((k, i) => keys.indexOf(k) === i);
+  check("no duplicate spans",
+        wrapped.length === 2 && uniq.length === 2, wrapped);
 }
 
 console.log("");

@@ -38,6 +38,14 @@ the bridge is allowed to exist at all: two methods, both taking two integers.
   a terminal that crashed on open, and an Approve button that could never
   appear. Both took minutes to find on a device and had survived reading the
   code twice.
+  The emulator runs on the office box, not here: `ssh root@100.67.1.26
+  android-emu start`, then adb with `/opt/android-sdk/platform-tools` on PATH.
+- **The pane is the one thing a unit test cannot see.** `terminal.html` renders,
+  and xterm only paints its link underline on hover, which a phone does not
+  have, so a URL was tappable and invisible while every check passed. After any
+  change to `app/src/main/assets/`, run
+  `~/.cache/clique-visual/bin/python tools/visual_check.py` and open the
+  screenshots it writes to `/tmp/clique-android-visual/`.
 
 ## Signing and release
 

@@ -178,24 +178,39 @@
       return false;
     }
 
-    function paneWrapParts(term, lineNumber) {
-      const buf = term.buffer.active;
-      let start = lineNumber - 1;
-      while (start > 0 && paneLineWrapped(term, start)) start--;
+    /* Same walk as paneWrapParts, but the row comes from a callback so
+     * tools/terminal_check.js can feed it a list instead of an xterm buffer.
+     * readRow(n) is 1-based and returns {text, wrapped} or null. */
+    function paneWrapPartsFrom(readRow, lineNumber) {
+      let start = lineNumber;
+      while (start > 1) {
+        const row = readRow(start);
+        if (!(row && row.wrapped)) break;
+        start--;
+      }
       const parts = [];
       let y = start;
-      while (y < buf.length) {
-        const line = buf.getLine(y);
-        if (!line) break;
-        if (y > start && !paneLineWrapped(term, y)) break;
-        parts.push({ y: y + 1, text: line.translateToString(true) });
+      for (;;) {
+        const row = readRow(y);
+        if (!row) break;
+        if (y > start && !row.wrapped) break;
+        parts.push({ y: y, text: row.text || "" });
         y++;
       }
       if (!parts.length) {
-        const line = buf.getLine(lineNumber - 1);
-        parts.push({ y: lineNumber, text: line ? line.translateToString(true) : "" });
+        const row = readRow(lineNumber);
+        parts.push({ y: lineNumber, text: row ? (row.text || "") : "" });
       }
       return parts;
+    }
+
+    function paneWrapParts(term, lineNumber) {
+      const buf = term.buffer.active;
+      return paneWrapPartsFrom(function(n) {
+        const line = buf.getLine(n - 1);
+        if (!line) return null;
+        return { text: line.translateToString(true), wrapped: paneLineWrapped(term, n - 1) };
+      }, lineNumber);
     }
 
     function paneRowsText(parts) {
@@ -285,6 +300,7 @@
     window.BARE_RE = BARE_RE;
     window.trimUrl = trimUrl;
     window.paneLineWrapped = paneLineWrapped;
+    window.paneWrapPartsFrom = paneWrapPartsFrom;
     window.paneWrapParts = paneWrapParts;
     window.paneRowsText = paneRowsText;
     window.paneUrlSegments = paneUrlSegments;
@@ -304,6 +320,22 @@
       }
       for (const hit of paneBareLinks(parts, lineNumber)) links.push(hit);
       return links;
+    };
+
+    /* Spans for every link on the visible rows. termLinks already keeps one
+     * row's slice, so asking it once per viewport line is the whole list.
+     * A wrap walk may read above from; those rows are not returned. */
+    window.termVisibleLinks = function(readRow, from, to) {
+      const out = [];
+      for (let line = from; line <= to; line++) {
+        const parts = paneWrapPartsFrom(readRow, line);
+        // termLinks keeps only the slice that falls on `line`, so walking the
+        // viewport row by row cannot produce the same span twice.
+        for (const hit of window.termLinks(parts, line)) {
+          out.push({ y: hit.y, x0: hit.x0, x1: hit.x1, url: hit.url });
+        }
+      }
+      return out;
     };
 
     if (term.registerLinkProvider) {   // older core: links simply stay text
@@ -329,10 +361,88 @@
         },
       });
     }
+
+    /* xterm only draws link underlines on hover. A phone has no hover, so
+     * the provider's tap target is real and invisible. Markers + decorations
+     * draw the underline ourselves. Proposed API: skip the whole thing if
+     * either register is missing, the same way the link provider is guarded. */
+    let rebuildVisibleLinks = () => {};
+    if (term.registerMarker && term.registerDecoration) {
+      let lastKey = null;
+      let decorations = [];
+      let markers = [];
+      const visibleReadRow = (n) => {
+        try {
+          const line = term.buffer.active.getLine(n - 1);
+          if (!line) return null;
+          return { text: line.translateToString(true), wrapped: paneLineWrapped(term, n - 1) };
+        } catch (err) {
+          return null;
+        }
+      };
+      rebuildVisibleLinks = () => {
+        const buf = term.buffer.active;
+        const from = buf.viewportY + 1;
+        const to = from + term.rows - 1;
+        const spans = window.termVisibleLinks(visibleReadRow, from, to);
+        let key = "";
+        for (let i = 0; i < spans.length; i++) {
+          const s = spans[i];
+          key += s.y + ":" + s.x0 + ":" + s.x1 + ":" + s.url + "\n";
+        }
+        if (key === lastKey) return;
+        lastKey = key;
+        for (const d of decorations) {
+          try { d.dispose(); } catch (e) {}
+        }
+        for (const m of markers) {
+          try { m.dispose(); } catch (e) {}
+        }
+        decorations = [];
+        markers = [];
+        for (const span of spans) {
+          try {
+            const offset = (span.y - 1) - (buf.baseY + buf.cursorY);
+            const marker = term.registerMarker(offset);
+            if (!marker) continue;
+            const decoration = term.registerDecoration({
+              marker: marker,
+              x: span.x0 - 1,
+              width: span.x1 - span.x0 + 1,
+              layer: 'top'
+            });
+            if (!decoration) {
+              try { marker.dispose(); } catch (e) {}
+              continue;
+            }
+            decoration.onRender((el) => {
+              el.style.borderBottom = '1px solid #5FA8F5';
+              el.style.boxSizing = 'border-box';
+              el.style.pointerEvents = 'none';
+            });
+            markers.push(marker);
+            decorations.push(decoration);
+          } catch (e) { /* trimmed scrollback, or a negative x */ }
+        }
+      };
+      /* onRender fires constantly during a build log. One trailing timer
+       * for both render and scroll, so a burst collapses to a single rebuild. */
+      let timer = null;
+      const scheduleVisibleLinks = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          timer = null;
+          rebuildVisibleLinks();
+        }, 100);
+      };
+      term.onRender(scheduleVisibleLinks);
+      term.onScroll(scheduleVisibleLinks);
+    }
     window.onresize = reportSize;
     setTimeout(() => {
       reportSize();
       if (window.CliqueBridge) CliqueBridge.onReady(term.cols, term.rows);
+      rebuildVisibleLinks();
     }, 50);
   </script>
 </body>
