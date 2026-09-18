@@ -9,7 +9,7 @@ Everything here already exists server-side and is documented in
 unless it says so, which is the point: **the API is the whole surface**, so a
 port is a UI job, not a protocol job.
 
-Status as of 0.1.8, 2026-09-17.
+Status as of 0.2.0, 2026-09-18.
 
 The app ships from our own F-Droid repository at https://fdroid.useclique.dev,
 so a release reaches a phone as an ordinary update notification. Cutting one is
@@ -27,8 +27,8 @@ as a bug.
 | ~~Running at the top, folders in order, Archived last~~ | `GET /api/state` | Done in 0.1.4 |
 | ~~Pinned sessions float~~ | `GET /api/state` | Done in 0.1.4 |
 | ~~Releasing the shared terminal size~~ | ws `release` | Done in 0.1.4 |
-| Folder colour ignored | `folders[].color` | The panel colours every folder; the app draws all headers the same, so the grouping reads as arbitrary |
-| No attention ring | `sessions[].signal` | The panel marks a session that is waiting or has errored. The list now shows the state and the `saying` in its meta line, but there is still no ring, so it does not read at a glance |
+| ~~Folder colour ignored~~ | `folders[].color` | Done in 0.2.0. `parseFolderColor` falls back to the muted look rather than drawing black for a value it cannot read |
+| ~~No way to answer from the list~~ | `sessions[].signal` | Done in 0.2.0. The dot was already coloured by state and `saying` was already on the meta line, so what was actually missing was acting on it: a session asking permission now carries Approve and Deny on its own row. Only a genuine permission prompt gets them, not every waiting session |
 | ~~The toolbar shows the raw session id for a moment~~ | `GET /api/state` | Done in 0.1.7 |
 
 ## Tier 1: the app cannot drive an agent without these
@@ -40,10 +40,11 @@ every other CLI here ask questions, and the answer is usually a keystroke.
 |---|---|---|
 | **Send a bare key** | `POST /api/sessions/<id>/send` `{"key":"C-c"}` | Already in the API, not exposed in the app. Escape, Ctrl-C, Enter, Up, Tab, and the digits. This is the single biggest gap: today a runaway agent cannot be stopped from the phone at all |
 | ~~**Approve / Deny**~~ | `signal_note` = `"permission"`, then a key | Done in 0.1.7, **on the notification**, not on the session screen. Opening a session attaches a tmux client, that repaints the pane, and the panel reads output-after-a-signal as the session having carried on, so the signal is gone in under three seconds. Measured. The banner exists too but is rarely reachable |
+| ~~**Select text off the pane**~~ | none | Done in 0.2.0. Not on this list originally, asked for on 2026-09-18. The last 500 rows go into a native selectable TextView, because xterm's hidden textarea stays inert and there is no touch selection in the pane by design |
 | ~~**A key bar above the prompt**~~ | as above | Done in 0.1.5. Visible buttons at 48dp, riding the keyboard with the prompt, with spoken labels for the screen reader |
-| **Scroll the terminal** | none | Verify first. Touch scrolling reaches the WebView, but xterm's viewport has never been tested under a finger on a real device |
-| **Rename / move a session** | `PATCH /api/sessions/<id>` | Creating one from the phone works; correcting it does not |
-| **Interrupt from the list** | `POST /api/sessions/<id>/send` | Without opening the session. Same reasoning as Approve/Deny above: anything that must act on a signalling session should not attach to it |
+| ~~**Scroll the terminal**~~ | none | Done in 0.2.0, and it was broken rather than untested. xterm draws its screen over its own viewport, so a finger lands on an element whose scrollable ancestor is `body`, which is `overflow:hidden`; the desktop only works because xterm listens for wheel events, and a touch produces none. A drag is now translated into `scrollLines` |
+| ~~**Rename / move a session**~~ | `PATCH /api/sessions/<id>` | Done in 0.2.0, on the long press. `"folder": null` is Ungrouped, which is why the client separates clearing it from leaving it alone |
+| ~~**Interrupt from the list**~~ | `POST /api/sessions/<id>/send` | Done in 0.2.0, on the long press, no confirm: a soft interrupt is not destructive |
 
 ## Tier 2: what makes it worth picking up
 
