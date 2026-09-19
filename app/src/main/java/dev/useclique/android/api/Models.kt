@@ -58,6 +58,13 @@ data class Prompt(
 
 data class ApiException(val status: Int, val body: String) : RuntimeException("HTTP $status $body")
 
+/* The isNull check is not redundant, and a JVM test cannot prove it.
+ *
+ * Android's org.json answers the string "null" for a JSON null, because its
+ * optString stringifies whatever opt returned and JSONObject.NULL.toString()
+ * is "null". The reference org.json on the test classpath returns the default
+ * instead. So swapping this for a bare optString passes every unit test here
+ * and puts the word "null" in front of a person on a phone. */
 fun JSONObject.optStr(key: String): String = if (isNull(key)) "" else optString(key, "")
 
 fun JSONArray.objects(): List<JSONObject> {
@@ -143,3 +150,5 @@ fun parsePrompts(raw: JSONArray): List<Prompt> {
         )
     }
 }
+
+fun parsePaste(raw: JSONObject): String = raw.optStr("path")

@@ -61,7 +61,7 @@ every other CLI here ask questions, and the answer is usually a keystroke.
 | **Diff** | `GET /api/sessions/<id>/diff` | What a session changed, from a phone, is a genuinely good review surface |
 | **Resume a past conversation** | `GET /api/resumable`, then create with `cli_session_id` | |
 | **Themes** | `PATCH /api/settings`, `GET /api/themes` | The app is hardcoded to one palette. The chosen theme is server state and should follow the person; note the built-in presets ship inside the web front end, so the app needs its own copy of those, and `/api/themes` returns only ones made on this panel |
-| **Paste an image** | `POST /api/sessions/<id>/paste` | A screenshot from the phone into the agent's working directory. Phone-native, and the panel had to be taught it |
+| ~~**Paste an image**~~ | `POST /api/sessions/<id>/paste` | Done in 0.3.1. An image button in the prompt bar opens the system photo picker, which needs no permission at all, so the app still asks for nothing to read an image. The file lands in the session's own .claude-images and the path goes into the prompt; it is never sent, because the person says what they want asking about it first. Old note follows. | A screenshot from the phone into the agent's working directory. Phone-native, and the panel had to be taught it |
 
 ## Tier 3: leave it on the laptop
 

@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -30,6 +31,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -40,6 +42,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.IOException
 import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
@@ -83,9 +86,18 @@ class SessionFragment : Fragment() {
         }
     }
 
+    private lateinit var attach: View
+
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* watching still starts; the notification may be silent if denied */ }
+
+    /* The photo picker, which needs no permission at all: that is the whole
+       reason it exists, and it is why this app still asks for nothing to read
+       an image. */
+    private val pickImage = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) attachImage(uri) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -157,6 +169,12 @@ class SessionFragment : Fragment() {
             }
         }
         view.findViewById<View>(R.id.send).setOnClickListener { sendPrompt() }
+        attach = view.findViewById(R.id.attach)
+        attach.setOnClickListener {
+            pickImage.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+        }
         view.findViewById<View>(R.id.permission_approve).setOnClickListener {
             answered(view)
             sendKeystroke("Enter")
@@ -308,6 +326,66 @@ class SessionFragment : Fragment() {
                 Toast.makeText(requireContext(), e.message ?: getString(R.string.send_failed), Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /* An image goes into the session's own folder and its path goes into the
+       prompt. It is never sent: the person says what they want asking about it
+       first, which is the same rule the prompt history picker follows. */
+    private fun attachImage(uri: Uri) {
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        attach.isEnabled = false
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val (bytes, name) = withContext(Dispatchers.IO) {
+                    val resolver = requireContext().contentResolver
+                    val data = resolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IOException("could not read the image")
+                    data to imageName(resolver, uri)
+                }
+                // Refused here rather than by the server, which would answer
+                // 413 and leave the person looking at nothing.
+                if (bytes.size > MAX_IMAGE_BYTES) {
+                    Toast.makeText(requireContext(), R.string.attach_too_big, Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                val path = withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).paste(sessionId, bytes, name)
+                }
+                if (path.isBlank()) throw IOException("the panel saved nothing")
+                insertIntoPrompt(path)
+            } catch (e: Exception) {
+                if (isAdded) {
+                    Toast.makeText(
+                        requireContext(),
+                        e.message ?: getString(R.string.attach_failed),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            } finally {
+                if (isAdded) attach.isEnabled = true
+            }
+        }
+    }
+
+    private fun imageName(resolver: android.content.ContentResolver, uri: Uri): String {
+        val shown = try {
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+        // The server sniffs the real type from the bytes, so this is a label
+        // rather than a claim about what the file is.
+        return shown?.takeIf { it.isNotBlank() } ?: "shot.png"
+    }
+
+    private fun insertIntoPrompt(path: String) {
+        val at = prompt.selectionEnd.takeIf { it >= 0 } ?: prompt.text.length
+        prompt.text.insert(at, "$path ")
+        prompt.requestFocus()
     }
 
     private fun sendPrompt() {
@@ -575,6 +653,9 @@ class SessionFragment : Fragment() {
         // 500 is a cap: the buffer holds 8000 and a selectable TextView
         // holding all of it is slow to select in.
         private const val SELECT_TEXT_LINES = 500
+        // What the panel's /paste accepts. Checked here so a 12 MB photo is
+        // refused with a sentence rather than a 413 nobody sees.
+        private const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
         private const val ARG_SERVER = "serverId"
         private const val ARG_SESSION = "sessionId"
 

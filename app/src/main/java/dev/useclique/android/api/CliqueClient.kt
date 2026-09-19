@@ -120,6 +120,17 @@ class CliqueClient(
         return parsePeek(JSONObject(body))
     }
 
+    /* The image lands in the session's own .claude-images and the caller gets
+       the path back to put in the prompt. The agent is told about a file; the
+       pixels never go through the pane. */
+    fun paste(id: String, bytes: ByteArray, name: String): String {
+        val payload = JSONObject()
+            .put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+            .put("name", name)
+            .toString()
+        return parsePaste(JSONObject(authed("api/sessions/$id/paste").post(payload)))
+    }
+
     fun prompts(limit: Int): List<Prompt> {
         val body = authedQuery("api/prompts", "limit" to limit.toString()).get()
         return parsePrompts(JSONArray(body))

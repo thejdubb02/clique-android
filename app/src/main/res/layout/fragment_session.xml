@@ -133,6 +133,24 @@
         android:padding="8dp"
         android:gravity="bottom">
 
+        <!--
+          Before the input rather than beside Send: a thumb reaching for Send
+          should never find this, and an image is something you add before you
+          write about it.
+        -->
+        <ImageButton
+            android:id="@+id/attach"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:padding="12dp"
+            android:background="@drawable/field_bg"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:contentDescription="@string/attach_image"
+            android:scaleType="fitCenter" />
+
         <EditText
             android:id="@+id/prompt_input"
             android:layout_width="0dp"

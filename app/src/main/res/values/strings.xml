@@ -113,4 +113,7 @@
     <string name="peek_hide">hide last lines</string>
     <string name="peek_loading">loading</string>
     <string name="peek_empty">nothing on screen</string>
+    <string name="attach_image">Attach an image</string>
+    <string name="attach_too_big">That image is over 10 MB, which the panel will not take.</string>
+    <string name="attach_failed">Could not send the image.</string>
 </resources>
