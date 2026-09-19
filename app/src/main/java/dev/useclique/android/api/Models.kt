@@ -48,6 +48,14 @@ data class Claim(
     val name: String,
 )
 
+data class Prompt(
+    val text: String,
+    val cli: String,
+    val cwd: String,
+    val project: String,
+    val whenSeconds: Long,
+)
+
 data class ApiException(val status: Int, val body: String) : RuntimeException("HTTP $status $body")
 
 fun JSONObject.optStr(key: String): String = if (isNull(key)) "" else optString(key, "")
@@ -120,4 +128,18 @@ fun parsePeek(raw: JSONObject): List<String> {
         out.add(arr.optString(i))
     }
     return out
+}
+
+fun parsePrompts(raw: JSONArray): List<Prompt> {
+    return raw.objects().mapNotNull {
+        val text = it.optStr("text")
+        if (text.isBlank()) return@mapNotNull null
+        Prompt(
+            text = text,
+            cli = it.optStr("cli"),
+            cwd = it.optStr("cwd"),
+            project = it.optStr("project"),
+            whenSeconds = it.optLong("when"),
+        )
+    }
 }

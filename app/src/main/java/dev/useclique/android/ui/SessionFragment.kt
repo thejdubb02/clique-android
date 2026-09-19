@@ -19,10 +19,12 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -31,14 +33,18 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
 import dev.useclique.android.api.CliqueClient
+import dev.useclique.android.api.Prompt
 import dev.useclique.android.api.Session
 import dev.useclique.android.api.openableUrl
 import dev.useclique.android.api.wantsPermission
@@ -105,6 +111,7 @@ class SessionFragment : Fragment() {
         toolbar.inflateMenu(R.menu.session)
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.history -> showPromptHistory()
                 R.id.selectText -> {
                     bridge?.readText(SELECT_TEXT_LINES) { text ->
                         if (!isAdded) return@readText
@@ -328,6 +335,138 @@ class SessionFragment : Fragment() {
         }
     }
 
+    // Drops the recalled text into the prompt. Does not send it.
+    private fun showPromptHistory() {
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        val pad = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            16f,
+            resources.displayMetrics,
+        ).toInt()
+        val root = layoutInflater.inflate(R.layout.dialog_prompt_history, null)
+        val search = root.findViewById<EditText>(R.id.search)
+        val list = root.findViewById<RecyclerView>(R.id.list)
+        val status = root.findViewById<TextView>(R.id.status)
+        val listArea = root.findViewById<View>(R.id.list_area)
+        val dm = resources.displayMetrics
+        // Sized so Cancel survives the keyboard. Searching is the first thing
+        // anyone does here, the IME then takes about 40% of a phone screen, and
+        // a list measured against the whole screen pushed the buttons off the
+        // bottom where only the back gesture could reach them.
+        val chrome = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 220f, dm).toInt()
+        val listHeight = minOf(
+            (dm.heightPixels * 0.38f).toInt(),
+            dm.heightPixels - chrome,
+        ).coerceAtLeast(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 160f, dm).toInt())
+        (listArea.layoutParams as LinearLayout.LayoutParams).apply {
+            height = listHeight
+            weight = 0f
+        }
+        val box = FrameLayout(requireContext()).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(
+                root,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+
+        var all = emptyList<Prompt>()
+        var ready = false
+        var failed = false
+        val shown = mutableListOf<Prompt>()
+
+        fun render() {
+            if (failed) {
+                status.visibility = View.VISIBLE
+                status.setText(R.string.prompt_history_failed)
+                shown.clear()
+                list.adapter?.notifyDataSetChanged()
+                return
+            }
+            if (!ready) {
+                status.visibility = View.VISIBLE
+                status.setText(R.string.prompt_history_loading)
+                return
+            }
+            val q = search.text.toString()
+            val filtered = if (q.isBlank()) all else all.filter { it.text.contains(q, ignoreCase = true) }
+            shown.clear()
+            shown.addAll(filtered)
+            list.adapter?.notifyDataSetChanged()
+            if (shown.isEmpty()) {
+                status.visibility = View.VISIBLE
+                status.setText(R.string.prompt_history_empty)
+            } else {
+                status.visibility = View.GONE
+            }
+        }
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.prompt_history_title)
+            .setView(box)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        list.layoutManager = LinearLayoutManager(requireContext())
+        list.adapter = object : RecyclerView.Adapter<PromptHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PromptHolder {
+                val v = layoutInflater.inflate(R.layout.item_prompt, parent, false)
+                return PromptHolder(v)
+            }
+
+            override fun getItemCount() = shown.size
+
+            override fun onBindViewHolder(holder: PromptHolder, position: Int) {
+                val item = shown[position]
+                holder.text.text = item.text
+                val where = item.project.ifBlank { item.cwd }
+                holder.meta.text = where
+                holder.meta.visibility = if (where.isBlank()) View.GONE else View.VISIBLE
+                holder.itemView.setOnClickListener {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+                    val chosen = shown[pos]
+                    prompt.setText(chosen.text)
+                    prompt.setSelection(chosen.text.length)
+                    dialog.dismiss()
+                    prompt.requestFocus()
+                }
+            }
+        }
+
+        search.doAfterTextChanged { render() }
+        dialog.show()
+        val width = minOf(
+            (dm.widthPixels * 0.9f).toInt(),
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 480f, dm).toInt(),
+        )
+        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+        dialog.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+        )
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val rows = withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).prompts(400)
+                }
+                if (!isAdded || !dialog.isShowing) return@launch
+                all = rows
+                ready = true
+                render()
+            } catch (_: Exception) {
+                if (!isAdded || !dialog.isShowing) return@launch
+                failed = true
+                render()
+            }
+        }
+    }
+
     private fun showSelectText(text: String) {
         if (text.isBlank()) {
             Toast.makeText(requireContext(), R.string.select_text_empty, Toast.LENGTH_SHORT).show()
@@ -424,6 +563,11 @@ class SessionFragment : Fragment() {
             ) == PackageManager.PERMISSION_GRANTED
             if (!ok) notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private class PromptHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val text: TextView = view.findViewById(R.id.text)
+        val meta: TextView = view.findViewById(R.id.meta)
     }
 
     companion object {

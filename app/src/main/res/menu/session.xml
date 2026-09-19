@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:id="@+id/history" android:title="@string/history" app:showAsAction="never" />
     <item android:id="@+id/selectText" android:title="@string/select_text" app:showAsAction="never" />
     <item android:id="@+id/kill" android:title="@string/kill" app:showAsAction="never" />
     <item android:id="@+id/start" android:title="@string/start" app:showAsAction="never" />

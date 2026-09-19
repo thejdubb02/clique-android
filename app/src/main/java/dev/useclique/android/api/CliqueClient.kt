@@ -8,6 +8,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONArray
 import org.json.JSONObject
 import dev.useclique.android.store.Server
 import java.io.IOException
@@ -117,6 +118,11 @@ class CliqueClient(
     fun peek(id: String, lines: Int): List<String> {
         val body = authedQuery("api/sessions/$id/peek", "lines" to lines.toString()).get()
         return parsePeek(JSONObject(body))
+    }
+
+    fun prompts(limit: Int): List<Prompt> {
+        val body = authedQuery("api/prompts", "limit" to limit.toString()).get()
+        return parsePrompts(JSONArray(body))
     }
 
     fun wait(sessionId: String, forStates: String = "idle,waiting,error,stopped", timeout: Int = 300): JSONObject {
