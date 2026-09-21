@@ -186,7 +186,7 @@ class TerminalBridge(
      *
      * evaluateJavascript crosses a process boundary, and that transaction has
      * a ceiling of roughly a megabyte. A running session sends its entire
-     * scrollback the moment a client attaches, and the server keeps 20,000
+     * scrollback the moment a client attaches, and the server keeps 50,000
      * lines, which base64s to several megabytes. Handing that over in one call
      * does not fail gracefully, it kills the app: opening a busy session
      * crashed every time while an empty one was fine, which is exactly the
