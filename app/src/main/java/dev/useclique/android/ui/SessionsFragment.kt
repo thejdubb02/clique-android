@@ -49,6 +49,10 @@ class SessionsFragment : Fragment() {
     private val items = mutableListOf<Item>()
     private var lastState: PanelState? = null
     private var query: String = ""
+    // A generation counter for load(), so a slow request that started before
+    // a kill cannot land after the fast one that followed it and repaint a
+    // session as alive again. Last *request*, not last *response*, wins.
+    private var loadGen = 0
     private var activeOnly: Boolean = true
     /*
       Same quiet window as SessionFragment. The poll is every three seconds,
@@ -128,11 +132,13 @@ class SessionsFragment : Fragment() {
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
         if (!silent) refresh.isRefreshing = true
+        val gen = ++loadGen
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val state = withContext(Dispatchers.IO) {
                     CliqueClient.forServer(server, token).state()
                 }
+                if (gen != loadGen) return@launch
                 bind(state)
                 refreshExpandedPeeks()
             } catch (e: Exception) {

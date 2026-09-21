@@ -35,6 +35,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -78,6 +79,11 @@ class SessionFragment : Fragment() {
       poll after that says so.
     */
     private var answeredUntil = 0L
+    // Same reasoning as SessionsFragment's loadGen: a kill or start fired
+    // from here triggers its own refresh, and a slower poll response already
+    // in flight from before that action must not land afterward and repaint
+    // the banner/title from stale state.
+    private var refreshGen = 0
     private val poll = object : Runnable {
         override fun run() {
             if (!isResumed) return
@@ -142,6 +148,17 @@ class SessionFragment : Fragment() {
 
 
         prompt = view.findViewById(R.id.prompt_input)
+        // A screenshot copied to the clipboard, then long-press "Paste" here:
+        // a plain EditText has no text form for that clip and drops it, which
+        // is why it didn't paste. Same destination as the attach button —
+        // attachImage() saves it into the session and drops the path in.
+        ViewCompat.setOnReceiveContentListener(prompt, arrayOf("image/*")) { _, payload ->
+            val split = payload.partition { it.uri != null }
+            split.first?.clip?.let { clip ->
+                for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let(::attachImage)
+            }
+            split.second
+        }
         // Real EditText. Enter sends; Shift+Enter inserts a newline.
         prompt.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -189,9 +206,25 @@ class SessionFragment : Fragment() {
         web.isFocusable = false
         web.isFocusableInTouchMode = false
         val client = CliqueClient.forServer(server, token)
-        bridge = TerminalBridge(web, client, sessionId).also {
-            it.onOpenUrl = { url -> if (isAdded) openUrl(url) }
-            it.attach()
+        // A stopped session has no /ws to attach to. The panel's own web
+        // client starts it first for the same reason, so opening one here
+        // works the same as tapping it in the list does there.
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val state = withContext(Dispatchers.IO) { client.state() }
+                val session = state.sessions.firstOrNull { it.id == sessionId }
+                if (session != null && !session.alive) {
+                    withContext(Dispatchers.IO) { client.start(sessionId) }
+                }
+            } catch (_: Exception) {
+                // Best effort — attach anyway. A session that is really gone
+                // just shows an empty pane, same as it always has.
+            }
+            if (!isAdded) return@launch
+            bridge = TerminalBridge(web, client, sessionId).also {
+                it.onOpenUrl = { url -> if (isAdded) openUrl(url) }
+                it.attach()
+            }
         }
 
         refreshState()
@@ -224,11 +257,13 @@ class SessionFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
+        val gen = ++refreshGen
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val state = withContext(Dispatchers.IO) {
                     CliqueClient.forServer(server, token).state()
                 }
+                if (gen != refreshGen) return@launch
                 val session = state.sessions.firstOrNull { it.id == sessionId } ?: return@launch
                 if (isAdded) applySession(session)
             } catch (_: Exception) {

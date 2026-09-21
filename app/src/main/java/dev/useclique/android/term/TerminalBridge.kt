@@ -145,6 +145,12 @@ class TerminalBridge(
     private fun connect() {
         if (opened) return
         opened = true
+        // The server always replays scrollback history on a fresh /ws attach,
+        // reconnect included, since it has no way to tell the two apart. A
+        // reconnect's buffer already has that history on screen, so without
+        // clearing it first the replay appends on top and reads as the last
+        // screen repeating itself.
+        webView.evaluateJavascript("window.termReset && window.termReset()", null)
         socket = client.openTerminal(sessionId, lastCols, lastRows, this)
     }
 

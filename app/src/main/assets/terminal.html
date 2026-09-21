@@ -132,6 +132,13 @@
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       term.write(bytes);
     };
+    /* Every new /ws attach, including a reconnect after a dropped network,
+     * gets the pane's scrollback history replayed before live output resumes
+     * — the server cannot tell a fresh open from a phone that dropped and
+     * came back. Called right before each connect so that replay lands in an
+     * empty buffer instead of appending onto what is already there, which
+     * read as the last screen repeating and swallowing itself mid-word. */
+    window.termReset = () => { term.reset(); };
     window.termFit = reportSize;
     /* Last n rows ending at the cursor, scrollback included. Read-only:
        no scroll, no focus, no selection. Mirrors the panel's paneLastLines
