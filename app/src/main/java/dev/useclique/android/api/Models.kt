@@ -32,6 +32,7 @@ data class Session(
     val pinned: Boolean = false,
     val archived: Boolean = false,
     val branch: String = "",
+    val draft: String = "",
 )
 
 data class PanelState(
@@ -107,6 +108,7 @@ fun parseState(raw: JSONObject): PanelState {
             pinned = it.optBoolean("pinned"),
             archived = it.optBoolean("archived"),
             branch = it.optStr("branch"),
+            draft = it.optStr("draft"),
         )
     } ?: emptyList()
 

@@ -41,6 +41,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -84,6 +85,11 @@ class SessionFragment : Fragment() {
     // in flight from before that action must not land afterward and repaint
     // the banner/title from stale state.
     private var refreshGen = 0
+    // applySession runs on every poll. Writing the box each time would replace
+    // a keystroke that has not been sent yet, so the saved draft is taken once.
+    private var draftLoaded = false
+    // What was last loaded or saved. A pause that changed nothing must not PATCH.
+    private var knownDraft = ""
     private val poll = object : Runnable {
         override fun run() {
             if (!isResumed) return
@@ -240,10 +246,30 @@ class SessionFragment : Fragment() {
     }
 
     override fun onPause() {
+        saveDraft()
         handler.removeCallbacks(poll)
         if (WaitService.onScreen == "$serverId:$sessionId") WaitService.onScreen = null
         bridge?.release()
         super.onPause()
+    }
+
+    /* Leaving is the save. The view scope is cancelled on the way out, which
+       is when this has to be sent, so the call is not tied to it. A dead
+       session or a blip on the way out must not throw from here. */
+    private fun saveDraft() {
+        if (!::prompt.isInitialized) return
+        val text = prompt.text.toString()
+        if (text == knownDraft) return
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        knownDraft = text
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CliqueClient.forServer(server, token).updateSession(sessionId, draft = text)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     override fun onDestroyView() {
@@ -277,6 +303,15 @@ class SessionFragment : Fragment() {
     }
 
     private fun applySession(session: Session) {
+        if (!draftLoaded && view != null && ::prompt.isInitialized) {
+            draftLoaded = true
+            // An empty box takes the saved draft. Anything already typed stays.
+            if (prompt.text.isEmpty()) {
+                prompt.setText(session.draft)
+                if (prompt.text.isNotEmpty()) prompt.setSelection(prompt.text.length)
+            }
+            knownDraft = session.draft
+        }
         sessionName = session.name
         toolbar.title = session.name
         toolbar.subtitle = session.cliLabel

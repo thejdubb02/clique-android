@@ -82,14 +82,17 @@ class CliqueClient(
         name: String? = null,
         folder: String? = null,
         clearFolder: Boolean = false,
+        draft: String? = null,
     ) {
         // Only the fields given. `"folder": null` is Ungrouped; omitting
         // folder leaves it where it is, which is why [clearFolder] is
-        // separate from [folder] being absent.
+        // separate from [folder] being absent. An empty draft clears it;
+        // unlike folder, absent and null are not a different value.
         val payload = JSONObject()
         if (name != null) payload.put("name", name)
         if (clearFolder) payload.put("folder", JSONObject.NULL)
         else if (folder != null) payload.put("folder", folder)
+        if (draft != null) payload.put("draft", draft)
         authed("api/sessions/$sessionId").patch(payload.toString())
     }
 
