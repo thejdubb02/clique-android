@@ -70,7 +70,9 @@ forever, they are refused now.
 
 File browser and editor · artifacts · uploads · storage and purge · webhook test
 · model providers and keys · plan usage · working groups · adopt and orphan reaping
-· manual reordering · stats and history graphs.
+· manual reordering · stats and history graphs · the compacting favicon spinner
+(0.79.0 — browser-tab chrome; a native app has no favicon to spin, and the
+underlying signal already reaches the app the same as `waiting`/`error`).
 
 All of them either need a big screen, are administrative rather than
 operational, or are things nobody does standing up.
