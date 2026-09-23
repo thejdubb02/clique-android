@@ -142,6 +142,9 @@ class SessionFragment : Fragment() {
                         showSelectText(text)
                     }
                 }
+                R.id.diff -> act.showDiff(serverId, sessionId)
+                R.id.transcript -> act.showTranscript(serverId, sessionId)
+                R.id.notes -> act.showNotes(serverId, sessionId)
                 R.id.kill -> runOp { it.kill(sessionId) }
                 R.id.start -> runOp { it.start(sessionId) }
                 R.id.delete -> confirmDelete(sessionName) {

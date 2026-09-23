@@ -17,4 +17,6 @@
     <color name="bar">#FF0E1116</color>
     <color name="ime_bar">#FF161B22</color>
     <color name="launcher_bg">#FF0E1116</color>
+    <color name="diff_added">#FF3FB950</color>
+    <color name="diff_removed">#FFF85149</color>
 </resources>

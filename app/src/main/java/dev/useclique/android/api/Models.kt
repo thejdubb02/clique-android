@@ -57,6 +57,56 @@ data class Prompt(
     val whenSeconds: Long,
 )
 
+data class ResumableConversation(
+    val cli: String,
+    val cliSessionId: String,
+    val cwd: String,
+    val project: String,
+    val label: String,
+    val updated: Double,
+    val size: Int,
+    val branch: String,
+    val folder: String,
+)
+
+data class SessionDiff(
+    val repo: Boolean,
+    val name: String,
+    val diff: String,
+    val empty: Boolean,
+    val truncated: Boolean,
+    val untrackedHidden: Int,
+)
+
+data class TranscriptTurn(
+    val role: String,
+    val text: String,
+)
+
+data class Transcript(
+    val cli: String,
+    val name: String,
+    val turns: List<TranscriptTurn>,
+)
+
+/* The phone only flips [done] on a top-level row and posts the same array
+ * back. Children, reminders and the rest are set from the panel, so they stay
+ * inside [raw] and go back untouched. */
+data class NoteItem(val raw: JSONObject) {
+    val id: String get() = raw.optStr("id")
+    val text: String get() = raw.optStr("text")
+    var done: Boolean
+        get() = raw.optBoolean("done")
+        set(value) {
+            raw.put("done", value)
+        }
+}
+
+data class NotesOutline(
+    val rawItems: JSONArray,
+    val items: List<NoteItem>,
+)
+
 data class ApiException(val status: Int, val body: String) : RuntimeException("HTTP $status $body")
 
 /* The isNull check is not redundant, and a JVM test cannot prove it.
@@ -154,3 +204,55 @@ fun parsePrompts(raw: JSONArray): List<Prompt> {
 }
 
 fun parsePaste(raw: JSONObject): String = raw.optStr("path")
+
+fun parseResumable(arr: JSONArray): List<ResumableConversation> {
+    return arr.objects().map {
+        ResumableConversation(
+            cli = it.optStr("cli"),
+            cliSessionId = it.optStr("cli_session_id"),
+            cwd = it.optStr("cwd"),
+            project = it.optStr("project"),
+            label = it.optStr("label"),
+            updated = it.optDouble("updated", 0.0),
+            size = it.optInt("size", 0),
+            branch = it.optStr("branch"),
+            folder = it.optStr("folder"),
+        )
+    }
+}
+
+fun parseDiff(raw: JSONObject): SessionDiff {
+    return SessionDiff(
+        repo = raw.optBoolean("repo"),
+        name = raw.optStr("name"),
+        diff = raw.optStr("diff"),
+        empty = raw.optBoolean("empty"),
+        truncated = raw.optBoolean("truncated"),
+        untrackedHidden = raw.optInt("untracked_hidden", 0),
+    )
+}
+
+fun parseTranscript(raw: JSONObject): Transcript {
+    val turns = raw.optJSONArray("turns")?.objects()?.map {
+        TranscriptTurn(
+            role = it.optStr("role"),
+            text = it.optStr("text"),
+        )
+    } ?: emptyList()
+    return Transcript(
+        cli = raw.optStr("cli"),
+        name = raw.optStr("name"),
+        turns = turns,
+    )
+}
+
+fun parseNotes(raw: JSONObject): NotesOutline {
+    val arr = raw.optJSONArray("items") ?: JSONArray()
+    val items = ArrayList<NoteItem>(arr.length())
+    for (i in 0 until arr.length()) {
+        if (arr.isNull(i)) continue
+        val obj = arr.optJSONObject(i) ?: continue
+        items.add(NoteItem(obj))
+    }
+    return NotesOutline(arr, items)
+}

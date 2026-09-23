@@ -32,8 +32,8 @@ android {
         applicationId = "dev.useclique.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.4.0"
+        versionCode = 16
+        versionName = "0.5.0"
     }
 
     signingConfigs {

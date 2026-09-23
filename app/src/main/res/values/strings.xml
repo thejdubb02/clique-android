@@ -116,4 +116,22 @@
     <string name="attach_image">Attach an image</string>
     <string name="attach_too_big">That image is over 10 MB, which the panel will not take.</string>
     <string name="attach_failed">Could not send the image.</string>
+    <string name="resume">Resume a conversation</string>
+    <string name="resume_title">Resume</string>
+    <string name="empty_resumable">No past conversations found.</string>
+    <string name="ago_minutes">%1$dm ago</string>
+    <string name="ago_hours">%1$dh ago</string>
+    <string name="ago_days">%1$dd ago</string>
+    <string name="diff">Diff</string>
+    <string name="transcript">Transcript</string>
+    <string name="notes">Notes</string>
+    <string name="diff_not_repo">Not a git repository.</string>
+    <string name="diff_empty">No changes.</string>
+    <string name="diff_truncated">Truncated.</string>
+    <string name="diff_untracked">%1$d untracked file(s) not shown.</string>
+    <string name="transcript_you">You</string>
+    <string name="transcript_assistant">Assistant</string>
+    <string name="transcript_empty">No transcript available for this CLI.</string>
+    <string name="notes_empty">No notes for this session.</string>
+    <string name="could_not_load">Could not load.</string>
 </resources>

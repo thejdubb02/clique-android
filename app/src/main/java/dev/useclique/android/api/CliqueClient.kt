@@ -96,14 +96,42 @@ class CliqueClient(
         authed("api/sessions/$sessionId").patch(payload.toString())
     }
 
-    fun createSession(cli: String, cwd: String, name: String, folder: String?): String {
+    fun createSession(
+        cli: String,
+        cwd: String,
+        name: String,
+        folder: String?,
+        cliSessionId: String? = null,
+    ): String {
         val payload = JSONObject()
             .put("cli", cli)
             .put("cwd", cwd)
         if (name.isNotBlank()) payload.put("name", name)
         if (!folder.isNullOrBlank()) payload.put("folder", folder)
+        if (!cliSessionId.isNullOrBlank()) payload.put("cli_session_id", cliSessionId)
         val body = authed("api/sessions").post(payload.toString(), expected = 201)
         return JSONObject(body).getString("id")
+    }
+
+    fun resumable(): List<ResumableConversation> {
+        return parseResumable(JSONArray(authed("api/resumable").get()))
+    }
+
+    fun diff(sessionId: String): SessionDiff {
+        return parseDiff(JSONObject(authed("api/sessions/$sessionId/diff").get()))
+    }
+
+    fun transcript(sessionId: String): Transcript {
+        return parseTranscript(JSONObject(authed("api/sessions/$sessionId/transcript").get()))
+    }
+
+    fun getNotes(sessionId: String): NotesOutline {
+        return parseNotes(JSONObject(authed("api/sessions/$sessionId/notes").get()))
+    }
+
+    fun postNotes(sessionId: String, itemsJson: JSONArray) {
+        val payload = JSONObject().put("items", itemsJson).toString()
+        authed("api/sessions/$sessionId/notes").post(payload)
     }
 
     fun kill(sessionId: String) {

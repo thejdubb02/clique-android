@@ -3,6 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item android:id="@+id/history" android:title="@string/history" app:showAsAction="never" />
     <item android:id="@+id/selectText" android:title="@string/select_text" app:showAsAction="never" />
+    <item android:id="@+id/diff" android:title="@string/diff" android:icon="@drawable/ic_diff" app:showAsAction="never" />
+    <item android:id="@+id/transcript" android:title="@string/transcript" android:icon="@drawable/ic_transcript" app:showAsAction="never" />
+    <item android:id="@+id/notes" android:title="@string/notes" android:icon="@drawable/ic_notes" app:showAsAction="never" />
     <item android:id="@+id/kill" android:title="@string/kill" app:showAsAction="never" />
     <item android:id="@+id/start" android:title="@string/start" app:showAsAction="never" />
     <item android:id="@+id/delete" android:title="@string/delete" app:showAsAction="never" />

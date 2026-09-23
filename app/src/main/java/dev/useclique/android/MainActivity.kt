@@ -3,11 +3,15 @@ package dev.useclique.android
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import dev.useclique.android.ui.DiffFragment
 import dev.useclique.android.ui.EditServerFragment
 import dev.useclique.android.ui.NewSessionFragment
+import dev.useclique.android.ui.NotesFragment
+import dev.useclique.android.ui.ResumableFragment
 import dev.useclique.android.ui.ServersFragment
 import dev.useclique.android.ui.SessionFragment
 import dev.useclique.android.ui.SessionsFragment
+import dev.useclique.android.ui.TranscriptFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -100,6 +104,34 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.container, NewSessionFragment.newInstance(serverId))
             .addToBackStack("new-session")
+            .commit()
+    }
+
+    fun showResumable(serverId: String) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.container, ResumableFragment.newInstance(serverId))
+            .addToBackStack("resumable")
+            .commit()
+    }
+
+    fun showDiff(serverId: String, sessionId: String) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.container, DiffFragment.newInstance(serverId, sessionId))
+            .addToBackStack("diff")
+            .commit()
+    }
+
+    fun showTranscript(serverId: String, sessionId: String) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.container, TranscriptFragment.newInstance(serverId, sessionId))
+            .addToBackStack("transcript")
+            .commit()
+    }
+
+    fun showNotes(serverId: String, sessionId: String) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.container, NotesFragment.newInstance(serverId, sessionId))
+            .addToBackStack("notes")
             .commit()
     }
 

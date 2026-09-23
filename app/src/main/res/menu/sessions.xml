@@ -19,4 +19,9 @@
         android:id="@+id/edit_server"
         android:title="@string/edit_server"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/resume"
+        android:title="@string/resume"
+        android:icon="@drawable/ic_resume"
+        app:showAsAction="never" />
 </menu>

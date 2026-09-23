@@ -99,6 +99,10 @@ class SessionsFragment : Fragment() {
                     act.showEditServer(serverId)
                     true
                 }
+                R.id.resume -> {
+                    act.showResumable(serverId)
+                    true
+                }
                 R.id.active_only -> {
                     setActiveOnly(!activeOnly)
                     true
