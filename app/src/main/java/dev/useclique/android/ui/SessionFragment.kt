@@ -48,6 +48,7 @@ import java.io.IOException
 import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
 import dev.useclique.android.R
+import dev.useclique.android.api.BarSnippet
 import dev.useclique.android.api.CliqueClient
 import dev.useclique.android.api.Prompt
 import dev.useclique.android.api.Session
@@ -225,6 +226,7 @@ class SessionFragment : Fragment() {
                 if (session != null && !session.alive) {
                     withContext(Dispatchers.IO) { client.start(sessionId) }
                 }
+                if (isAdded) bindSnippetBar(view.findViewById(R.id.snippet_bar), state.barSnippets)
             } catch (_: Exception) {
                 // Best effort — attach anyway. A session that is really gone
                 // just shows an empty pane, same as it always has.
@@ -373,6 +375,58 @@ class SessionFragment : Fragment() {
         }
     }
 
+    private fun bindSnippetBar(row: LinearLayout, snippets: List<BarSnippet>) {
+        val scroll = view?.findViewById<View>(R.id.snippet_bar_scroll) ?: return
+        if (snippets.isEmpty()) {
+            scroll.visibility = View.GONE
+            return
+        }
+        scroll.visibility = View.VISIBLE
+        val pad = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 4f, resources.displayMetrics).toInt()
+        for (sn in snippets) {
+            val btn = Button(requireContext()).apply {
+                text = sn.label.ifBlank { sn.text }
+                isAllCaps = false
+                isFocusable = false
+                isFocusableInTouchMode = false
+                setTextColor(ContextCompat.getColor(context, R.color.text))
+                background = ContextCompat.getDrawable(context, R.drawable.field_bg)
+                minHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 44f, resources.displayMetrics).toInt()
+                minimumHeight = minHeight
+                setPadding(pad * 3, pad, pad * 3, pad)
+                gravity = Gravity.CENTER
+                setOnClickListener { sendText(sn.text) }
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = pad
+                marginEnd = pad
+            }
+            row.addView(btn, lp)
+        }
+    }
+
+    // Same path as Send — a tapped snippet is text landing in the pane right
+    // away, not something dropped in the box first.
+    private fun sendText(text: String, onFailure: () -> Unit = {}) {
+        val act = activity as MainActivity
+        val server = act.app.store.get(serverId) ?: return
+        val token = act.app.store.token(serverId)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    CliqueClient.forServer(server, token).send(sessionId, text, enter = true)
+                }
+                WaitService.watch(requireContext(), serverId, sessionId, sessionName)
+            } catch (e: Exception) {
+                onFailure()
+                Toast.makeText(requireContext(), e.message ?: getString(R.string.send_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun openUrl(url: String) {
         val safe = openableUrl(url) ?: return
         try {
@@ -464,24 +518,13 @@ class SessionFragment : Fragment() {
     private fun sendPrompt() {
         val text = prompt.text.toString()
         if (text.isEmpty()) return
-        val act = activity as MainActivity
-        val server = act.app.store.get(serverId) ?: return
-        val token = act.app.store.token(serverId)
         prompt.text.clear()
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    CliqueClient.forServer(server, token).send(sessionId, text, enter = true)
-                }
-                WaitService.watch(requireContext(), serverId, sessionId, sessionName)
-            } catch (e: Exception) {
-                // The field was cleared optimistically. Put it back rather than
-                // making him retype it from a toast.
-                if (prompt.text.isEmpty()) {
-                    prompt.setText(text)
-                    prompt.setSelection(text.length)
-                }
-                Toast.makeText(requireContext(), e.message ?: getString(R.string.send_failed), Toast.LENGTH_SHORT).show()
+        sendText(text) {
+            // The field was cleared optimistically. Put it back rather than
+            // making him retype it from a toast.
+            if (prompt.text.isEmpty()) {
+                prompt.setText(text)
+                prompt.setSelection(text.length)
             }
         }
     }

@@ -101,6 +101,31 @@
     </LinearLayout>
 
     <!--
+      Bar snippets: one-tap buttons for text set up in the panel's Settings >
+      Snippets with "bar" checked. Gone when there are none.
+    -->
+    <HorizontalScrollView
+        android:id="@+id/snippet_bar_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ime_bar"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/snippet_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="44dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="4dp" />
+    </HorizontalScrollView>
+
+    <!--
       Key bar and prompt ride the IME together: MainActivity pads the
       fragment container from WindowInsets, so both stay above the keyboard.
     -->

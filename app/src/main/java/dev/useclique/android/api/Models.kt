@@ -35,12 +35,19 @@ data class Session(
     val draft: String = "",
 )
 
+data class BarSnippet(
+    val label: String,
+    val text: String,
+    val color: String,
+)
+
 data class PanelState(
     val version: String,
     val home: String,
     val folders: List<Folder>,
     val sessions: List<Session>,
     val clis: List<Cli>,
+    val barSnippets: List<BarSnippet>,
 )
 
 data class Claim(
@@ -170,12 +177,20 @@ fun parseState(raw: JSONObject): PanelState {
         )
     } ?: emptyList()
 
+    // bar: true shows the snippet as a one-tap button, same list the text
+    // expander uses in the pane; trigger-only (non-bar) snippets never show.
+    val barSnippets = raw.optJSONObject("settings")?.optJSONArray("snippets")?.objects()
+        ?.filter { it.optBoolean("bar") && it.optStr("text").isNotBlank() }
+        ?.map { BarSnippet(label = it.optStr("label"), text = it.optStr("text"), color = it.optStr("color")) }
+        ?: emptyList()
+
     return PanelState(
         version = raw.optStr("version"),
         home = raw.optStr("home"),
         folders = folders,
         sessions = sessions,
         clis = clis,
+        barSnippets = barSnippets,
     )
 }
 
