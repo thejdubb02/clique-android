@@ -79,6 +79,11 @@
     <string name="rename_empty">Enter a name.</string>
     <string name="move_to_folder">Move to folder</string>
     <string name="delete">Delete</string>
+    <string name="broadcast">Broadcast</string>
+    <string name="broadcast_title">Broadcast to %1$s</string>
+    <string name="broadcast_hint">One instruction, every session in this folder</string>
+    <string name="broadcast_sent">Sent to %1$d session(s)</string>
+    <string name="broadcast_empty">Enter an instruction.</string>
     <string name="refresh">Refresh</string>
     <string name="working">working</string>
     <string name="waiting">waiting</string>

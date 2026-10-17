@@ -134,6 +134,18 @@ class CliqueClient(
         authed("api/sessions/$sessionId/notes").post(payload)
     }
 
+    /* One send, to every live session in a folder. Returns how many got it,
+       so the caller can tell "sent to 3" from "that folder is empty". */
+    fun broadcast(folder: String, text: String, enter: Boolean = true): Int {
+        val payload = JSONObject()
+            .put("text", text)
+            .put("enter", enter)
+            .put("folder", folder)
+            .toString()
+        val body = authed("api/broadcast").post(payload)
+        return JSONObject(body).optInt("count", 0)
+    }
+
     fun kill(sessionId: String) {
         authed("api/sessions/$sessionId/kill").post("{}")
     }

@@ -219,7 +219,7 @@ class SessionsFragment : Fragment() {
         for (item in groupSessions(state.sessions, state.folders, query, activeOnly)) {
             when (item) {
                 is SessionListItem.Header -> items.add(
-                    Item.Header(headerTitle(item.id, folderNames), folderColors[item.id]),
+                    Item.Header(item.id, headerTitle(item.id, folderNames), folderColors[item.id]),
                 )
                 is SessionListItem.Row -> items.add(Item.Row(item.session))
             }
@@ -276,9 +276,14 @@ class SessionsFragment : Fragment() {
     }
 
     private sealed class Item {
-        data class Header(val title: String, val color: String? = null) : Item()
+        data class Header(val id: String, val title: String, val color: String? = null) : Item()
         data class Row(val session: Session) : Item()
     }
+
+    /* A pseudo-group (Running/Ungrouped/Archived) isn't a real folder on the
+       panel, so there's nothing for `/api/broadcast`'s `folder` to match. */
+    private fun isRealFolder(id: String) =
+        id != GROUP_RUNNING && id != GROUP_UNGROUPED && id != GROUP_ARCHIVED
 
     private inner class Adapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         override fun getItemViewType(position: Int) = when (items[position]) {
@@ -298,17 +303,17 @@ class SessionsFragment : Fragment() {
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             when (val item = items[position]) {
-                is Item.Header -> (holder as HeaderHolder).bind(item.title, item.color)
+                is Item.Header -> (holder as HeaderHolder).bind(item.id, item.title, item.color)
                 is Item.Row -> (holder as RowHolder).bind(item.session)
             }
         }
     }
 
-    private class HeaderHolder(view: View) : RecyclerView.ViewHolder(view) {
+    private inner class HeaderHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.title)
         private val colorDot: View = view.findViewById(R.id.folder_color)
 
-        fun bind(titleText: String, rawColor: String?) {
+        fun bind(id: String, titleText: String, rawColor: String?) {
             title.text = titleText
             val fallback = ContextCompat.getColor(itemView.context, R.color.muted)
             val color = parseFolderColor(rawColor, fallback)
@@ -318,6 +323,10 @@ class SessionsFragment : Fragment() {
                 colorDot.visibility = View.VISIBLE
                 val bg = colorDot.background?.mutate()
                 if (bg is GradientDrawable) bg.setColor(color) else colorDot.setBackgroundColor(color)
+            }
+            itemView.setOnLongClickListener {
+                if (isRealFolder(id)) showBroadcast(id, titleText)
+                true
             }
         }
     }
@@ -464,6 +473,58 @@ class SessionsFragment : Fragment() {
                     runOp { it.updateSession(session.id, clearFolder = true) }
                 } else {
                     runOp { it.updateSession(session.id, folder = folders[which - 1].id) }
+                }
+            }
+            .show()
+    }
+
+    private fun showBroadcast(folderId: String, folderTitle: String) {
+        val pad = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            16f,
+            resources.displayMetrics,
+        ).toInt()
+        val input = EditText(requireContext()).apply {
+            hint = getString(R.string.broadcast_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setTextColor(ContextCompat.getColor(context, R.color.text))
+            setHintTextColor(ContextCompat.getColor(context, R.color.hint))
+            background = ContextCompat.getDrawable(context, R.drawable.field_bg)
+            setPadding(pad, pad / 2, pad, pad / 2)
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+        val box = FrameLayout(requireContext()).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.broadcast_title, folderTitle))
+            .setView(box)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.broadcast) { _, _ ->
+                val text = input.text.toString()
+                if (text.isBlank()) {
+                    Toast.makeText(requireContext(), R.string.broadcast_empty, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val act = activity as MainActivity
+                val server = act.app.store.get(serverId) ?: return@setPositiveButton
+                val token = act.app.store.token(serverId)
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        val count = withContext(Dispatchers.IO) {
+                            CliqueClient.forServer(server, token).broadcast(folderId, text)
+                        }
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.broadcast_sent, count),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        load(silent = true)
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), e.message, Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .show()
