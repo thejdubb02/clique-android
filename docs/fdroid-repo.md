@@ -49,6 +49,12 @@ that reaches the repo cannot be replaced by a correct one afterwards.
 **4. A phone that already has a sideloaded build must uninstall first.** Those
 were signed with the debug key. This is a one-time cost per device.
 
+**5. `publish.py` only runs when someone remembers to run it.** The repo sat
+at 0.3.2 (versionCode 14) through three merged releases (0.4.0-0.6.0, up to
+versionCode 17) because nobody re-ran it after those commits landed. Each
+merge to `main` is not a release; check `python3 tools/publish.py --dry-run`
+against the live index before assuming a phone is current.
+
 ## Publishing
 
 `python3 tools/publish.py`. Everything it does and refuses is in
