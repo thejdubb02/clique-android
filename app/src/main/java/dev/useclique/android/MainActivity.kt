@@ -13,6 +13,7 @@ import dev.useclique.android.ui.SessionFragment
 import dev.useclique.android.ui.SessionsFragment
 import dev.useclique.android.ui.TranscriptFragment
 import dev.useclique.android.ui.UsageFragment
+import dev.useclique.android.ui.shareImage
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +46,10 @@ class MainActivity : AppCompatActivity() {
         androidx.core.view.ViewCompat.requestApplyInsets(container)
 
         if (savedInstanceState == null) {
+            if (intent.action == android.content.Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)?.let { shareImage(this, it) }
+            }
             val store = app.store
             val serverId = intent.getStringExtra(EXTRA_SERVER_ID) ?: store.selectedId
             val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)

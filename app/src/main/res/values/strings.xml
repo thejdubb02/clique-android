@@ -146,4 +146,8 @@
     <string name="usage_resets_now">resets now</string>
     <string name="usage_resets_in">resets %1$s</string>
     <string name="could_not_load">Could not load.</string>
+    <string name="share_pick_session">Add image to which session?</string>
+    <string name="share_no_server">Pair a server in CLIque first.</string>
+    <string name="share_no_sessions">No running sessions to add it to.</string>
+    <string name="share_added">Image path added to %1$s\'s prompt draft</string>
 </resources>

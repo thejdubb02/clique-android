@@ -11,7 +11,6 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -496,19 +495,6 @@ class SessionFragment : Fragment() {
         }
     }
 
-    private fun imageName(resolver: android.content.ContentResolver, uri: Uri): String {
-        val shown = try {
-            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) c.getString(0) else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-        // The server sniffs the real type from the bytes, so this is a label
-        // rather than a claim about what the file is.
-        return shown?.takeIf { it.isNotBlank() } ?: "shot.png"
-    }
-
     private fun insertIntoPrompt(path: String) {
         val at = prompt.selectionEnd.takeIf { it >= 0 } ?: prompt.text.length
         prompt.text.insert(at, "$path ")
@@ -769,9 +755,6 @@ class SessionFragment : Fragment() {
         // 500 is a cap: the buffer holds 8000 and a selectable TextView
         // holding all of it is slow to select in.
         private const val SELECT_TEXT_LINES = 500
-        // What the panel's /paste accepts. Checked here so a 12 MB photo is
-        // refused with a sentence rather than a 413 nobody sees.
-        private const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
         private const val ARG_SERVER = "serverId"
         private const val ARG_SESSION = "sessionId"
 
