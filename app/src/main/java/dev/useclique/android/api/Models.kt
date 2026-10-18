@@ -271,3 +271,33 @@ fun parseNotes(raw: JSONObject): NotesOutline {
     }
     return NotesOutline(arr, items)
 }
+
+data class UsageWindow(
+    val label: String,
+    val percent: Double,
+    val resetsAt: String,
+)
+
+data class CliUsage(
+    val cli: String,
+    val windows: List<UsageWindow>,
+    val error: String,
+)
+
+fun parseUsage(raw: JSONObject): List<CliUsage> {
+    val arr = raw.optJSONArray("usage") ?: JSONArray()
+    return arr.objects().map { entry ->
+        val windows = entry.optJSONArray("windows")?.objects()?.map {
+            UsageWindow(
+                label = it.optStr("label"),
+                percent = it.optDouble("percent", 0.0),
+                resetsAt = it.optStr("resets_at"),
+            )
+        } ?: emptyList()
+        CliUsage(
+            cli = entry.optStr("cli"),
+            windows = windows,
+            error = entry.optStr("error"),
+        )
+    }
+}

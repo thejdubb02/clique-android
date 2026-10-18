@@ -24,4 +24,8 @@
         android:title="@string/resume"
         android:icon="@drawable/ic_resume"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/usage"
+        android:title="@string/usage"
+        app:showAsAction="never" />
 </menu>

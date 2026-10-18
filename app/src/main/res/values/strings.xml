@@ -138,5 +138,12 @@
     <string name="transcript_assistant">Assistant</string>
     <string name="transcript_empty">No transcript available for this CLI.</string>
     <string name="notes_empty">No notes for this session.</string>
+    <string name="usage">Plan usage</string>
+    <string name="usage_empty">No usage to show.</string>
+    <string name="usage_error">Couldn\'t read usage: %1$s</string>
+    <string name="usage_label_percent">%1$s · %2$d%%</string>
+    <string name="usage_label_percent_reset">%1$s · %2$d%% · %3$s</string>
+    <string name="usage_resets_now">resets now</string>
+    <string name="usage_resets_in">resets %1$s</string>
     <string name="could_not_load">Could not load.</string>
 </resources>

@@ -12,6 +12,7 @@ import dev.useclique.android.ui.ServersFragment
 import dev.useclique.android.ui.SessionFragment
 import dev.useclique.android.ui.SessionsFragment
 import dev.useclique.android.ui.TranscriptFragment
+import dev.useclique.android.ui.UsageFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -132,6 +133,13 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.container, NotesFragment.newInstance(serverId, sessionId))
             .addToBackStack("notes")
+            .commit()
+    }
+
+    fun showUsage(serverId: String) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.container, UsageFragment.newInstance(serverId))
+            .addToBackStack("usage")
             .commit()
     }
 

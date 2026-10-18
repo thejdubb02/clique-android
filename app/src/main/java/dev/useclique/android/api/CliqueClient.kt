@@ -129,6 +129,10 @@ class CliqueClient(
         return parseNotes(JSONObject(authed("api/sessions/$sessionId/notes").get()))
     }
 
+    fun usage(): List<CliUsage> {
+        return parseUsage(JSONObject(authedQuery("api/usage", "all" to "1").get()))
+    }
+
     fun postNotes(sessionId: String, itemsJson: JSONArray) {
         val payload = JSONObject().put("items", itemsJson).toString()
         authed("api/sessions/$sessionId/notes").post(payload)
