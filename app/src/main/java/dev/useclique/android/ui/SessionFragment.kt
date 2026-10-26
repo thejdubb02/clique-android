@@ -85,6 +85,7 @@ class SessionFragment : Fragment() {
     // in flight from before that action must not land afterward and repaint
     // the banner/title from stale state.
     private var refreshGen = 0
+    private var refreshing = false
     // applySession runs on every poll. Writing the box each time would replace
     // a keystroke that has not been sent yet, so the saved draft is taken once.
     private var draftLoaded = false
@@ -277,6 +278,8 @@ class SessionFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        refreshGen++
+        refreshing = false
         handler.removeCallbacks(poll)
         bridge?.detach()
         bridge = null
@@ -287,7 +290,9 @@ class SessionFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
+        if (refreshing) return
         val gen = ++refreshGen
+        refreshing = true
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val state = withContext(Dispatchers.IO) {
@@ -297,6 +302,8 @@ class SessionFragment : Fragment() {
                 val session = state.sessions.firstOrNull { it.id == sessionId } ?: return@launch
                 if (isAdded) applySession(session)
             } catch (_: Exception) {
+            } finally {
+                if (gen == refreshGen) refreshing = false
             }
         }
     }

@@ -53,6 +53,9 @@ class SessionsFragment : Fragment() {
     // a kill cannot land after the fast one that followed it and repaint a
     // session as alive again. Last *request*, not last *response*, wins.
     private var loadGen = 0
+    // A poll tick never starts a second request while one is out, or a slow
+    // answer would be bumped as stale by the next tick and never land.
+    private var loading = false
     private var activeOnly: Boolean = true
     /*
       Same quiet window as SessionFragment. The poll is every three seconds,
@@ -130,6 +133,13 @@ class SessionsFragment : Fragment() {
         handler.postDelayed(poll, 3000)
     }
 
+    override fun onDestroyView() {
+        // A request still out belongs to the dead view; the next view must poll.
+        loadGen++
+        loading = false
+        super.onDestroyView()
+    }
+
     override fun onPause() {
         handler.removeCallbacks(poll)
         super.onPause()
@@ -139,8 +149,10 @@ class SessionsFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
+        if (silent && loading) return
         if (!silent) refresh.isRefreshing = true
         val gen = ++loadGen
+        loading = true
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val state = withContext(Dispatchers.IO) {
@@ -154,6 +166,7 @@ class SessionsFragment : Fragment() {
                     Toast.makeText(requireContext(), e.message ?: getString(R.string.load_failed), Toast.LENGTH_SHORT).show()
                 }
             } finally {
+                if (gen == loadGen) loading = false
                 refresh.isRefreshing = false
             }
         }

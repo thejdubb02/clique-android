@@ -127,7 +127,9 @@ class NotesFragment : Fragment() {
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
         val snapshot = JSONArray(rawItems.toString())
-        CoroutineScope(Dispatchers.IO).launch {
+        // One writer, in toggle order: parallel PATCHes could land out of
+        // order and put an older snapshot over a newer one.
+        writer.execute {
             try {
                 CliqueClient.forServer(server, token).postNotes(sessionId, snapshot)
             } catch (_: Exception) {
@@ -136,6 +138,9 @@ class NotesFragment : Fragment() {
     }
 
     companion object {
+        private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r).apply { isDaemon = true }
+        }
         private const val ARG_SERVER = "serverId"
         private const val ARG_SESSION = "sessionId"
 

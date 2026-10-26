@@ -62,13 +62,18 @@ class WaitService : Service() {
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
         val name = intent.getStringExtra(EXTRA_NAME) ?: sessionId
         val key = "$serverId:$sessionId"
-        if (jobs.containsKey(key)) return START_STICKY
-        val future = pool.submit { watch(serverId, sessionId, name, key) }
-        jobs[key] = future
+        // watch() takes the same lock to deregister, so a watch that ends at
+        // once cannot remove itself before it is registered.
+        synchronized(jobs) {
+            if (jobs.containsKey(key)) return START_STICKY
+            val self = arrayOfNulls<Future<*>>(1)
+            self[0] = pool.submit { watch(serverId, sessionId, name, key, self) }
+            jobs[key] = self[0]!!
+        }
         return START_STICKY
     }
 
-    private fun watch(serverId: String, sessionId: String, name: String, key: String) {
+    private fun watch(serverId: String, sessionId: String, name: String, key: String, self: Array<Future<*>?>) {
         try {
             val app = application as CliqueApp
             val server = app.store.get(serverId) ?: return
@@ -107,10 +112,14 @@ class WaitService : Service() {
         } catch (_: Exception) {
             // Network drop or session gone: give up this watch rather than loop hot.
         } finally {
-            jobs.remove(key)
-            if (jobs.isEmpty()) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+            // Only our own entry (stopAll may have replaced it), and stop under
+            // the lock so a new start cannot register between check and stop.
+            synchronized(jobs) {
+                jobs.remove(key, self[0])
+                if (jobs.isEmpty()) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             }
         }
     }
