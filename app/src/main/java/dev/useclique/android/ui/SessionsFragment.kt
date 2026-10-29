@@ -65,6 +65,7 @@ class SessionsFragment : Fragment() {
     private val answeredUntil = HashMap<String, Long>()
     private val expanded = HashSet<String>()
     private val peekText = HashMap<String, String>()
+    private val peeking = HashSet<String>()
     private val handler = Handler(Looper.getMainLooper())
     private val poll = object : Runnable {
         override fun run() {
@@ -245,6 +246,7 @@ class SessionsFragment : Fragment() {
         for (session in state.sessions) liveIds.add(session.id)
         expanded.retainAll(liveIds)
         peekText.keys.retainAll(liveIds)
+        peeking.retainAll(liveIds)
         list.adapter?.notifyDataSetChanged()
         when {
             state.sessions.isEmpty() -> {
@@ -269,6 +271,7 @@ class SessionsFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
+        if (!peeking.add(id)) return
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val lines = withContext(Dispatchers.IO) {
@@ -279,6 +282,8 @@ class SessionsFragment : Fragment() {
                 if (pos >= 0) list.adapter?.notifyItemChanged(pos)
             } catch (_: Exception) {
                 // A peek is not worth a toast during a three-second poll.
+            } finally {
+                peeking.remove(id)
             }
         }
     }

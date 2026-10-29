@@ -43,9 +43,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import kotlinx.coroutines.withContext
 import dev.useclique.android.MainActivity
@@ -275,10 +275,14 @@ class SessionFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
-        knownDraft = text
-        CoroutineScope(Dispatchers.IO).launch {
+        act.app.draftScope.launch {
             try {
-                CliqueClient.forServer(server, token).updateSession(sessionId, draft = text)
+                act.app.draftSaveMutex.withLock {
+                    withContext(Dispatchers.IO) {
+                        CliqueClient.forServer(server, token).updateSession(sessionId, draft = text)
+                    }
+                    knownDraft = text
+                }
             } catch (_: Exception) {
             }
         }
@@ -578,7 +582,7 @@ class SessionFragment : Fragment() {
             try {
                 val (bytes, name) = withContext(Dispatchers.IO) {
                     val resolver = requireContext().contentResolver
-                    val data = resolver.openInputStream(uri)?.use { it.readBytes() }
+                    val data = resolver.openInputStream(uri)?.use(::readImageBytes)
                         ?: throw IOException("could not read the image")
                     data to imageName(resolver, uri)
                 }

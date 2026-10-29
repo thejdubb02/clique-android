@@ -24,12 +24,3 @@ fun waitNotice(waitState: String, session: Session?): WaitNotice {
     }
     return WaitNotice.FINISHED
 }
-
-/**
- * PendingIntent request code for a notification action. Unique per session
- * and key so two sessions cannot overwrite each other's buttons, and so
- * Approve and Deny on the same session stay distinct.
- */
-fun actionRequestCode(sessionId: String, key: String): Int {
-    return 31 * sessionId.hashCode() + key.hashCode()
-}

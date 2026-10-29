@@ -14,10 +14,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InputStream
 
 // What the panel's /paste accepts. Checked here so a 12 MB photo is refused
 // with a sentence rather than a 413 nobody sees.
 const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+fun readImageBytes(input: InputStream): ByteArray {
+    val bytes = ByteArray(MAX_IMAGE_BYTES + 1)
+    var used = 0
+    while (used < bytes.size) {
+        val read = input.read(bytes, used, bytes.size - used)
+        if (read < 0) break
+        if (read == 0) continue
+        used += read
+    }
+    return bytes.copyOf(used)
+}
 
 fun imageName(resolver: ContentResolver, uri: Uri): String {
     val shown = try {
@@ -72,7 +85,7 @@ private fun upload(act: MainActivity, client: CliqueClient, session: Session, ur
         try {
             withContext(Dispatchers.IO) {
                 val resolver = act.contentResolver
-                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                val bytes = resolver.openInputStream(uri)?.use(::readImageBytes)
                     ?: throw IOException(act.getString(R.string.attach_failed))
                 if (bytes.size > MAX_IMAGE_BYTES) throw IOException(act.getString(R.string.attach_too_big))
                 val saved = client.paste(session.id, bytes, imageName(resolver, uri))

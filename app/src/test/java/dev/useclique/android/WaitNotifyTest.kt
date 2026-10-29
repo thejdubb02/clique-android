@@ -2,10 +2,8 @@ package dev.useclique.android
 
 import dev.useclique.android.api.Session
 import dev.useclique.android.notify.WaitNotice
-import dev.useclique.android.notify.actionRequestCode
 import dev.useclique.android.notify.waitNotice
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class WaitNotifyTest {
@@ -42,30 +40,6 @@ class WaitNotifyTest {
     @Test
     fun waitingWithNoSessionIsFinished() {
         assertEquals(WaitNotice.FINISHED, waitNotice("waiting", null))
-    }
-
-    @Test
-    fun requestCodesDifferAcrossSessionIds() {
-        assertNotEquals(
-            actionRequestCode("sess-a", "Enter"),
-            actionRequestCode("sess-b", "Enter"),
-        )
-    }
-
-    @Test
-    fun requestCodeIsStableForTheSameId() {
-        assertEquals(
-            actionRequestCode("sess-a", "Enter"),
-            actionRequestCode("sess-a", "Enter"),
-        )
-    }
-
-    @Test
-    fun approveAndDenyDifferForTheSameSession() {
-        assertNotEquals(
-            actionRequestCode("sess-a", "Enter"),
-            actionRequestCode("sess-a", "Escape"),
-        )
     }
 
     private fun session(

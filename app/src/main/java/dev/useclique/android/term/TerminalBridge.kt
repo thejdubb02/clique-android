@@ -58,6 +58,7 @@ class TerminalBridge(
         webView.addJavascriptInterface(Js(), "CliqueBridge")
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
+                if (!attached.get()) return
                 view?.evaluateJavascript("window.termFit && window.termFit()", null)
             }
         }
@@ -65,16 +66,17 @@ class TerminalBridge(
     }
 
     fun detach() {
-        attached.set(false)
         release()
+        attached.set(false)
         socket?.close(1000, "bye")
         socket = null
         opened = false
         ready.set(false)
-        main.post {
-            webView.removeJavascriptInterface("CliqueBridge")
-            webView.loadUrl("about:blank")
-        }
+        pendingText = null
+        main.removeCallbacksAndMessages(null)
+        webView.removeJavascriptInterface("CliqueBridge")
+        webView.loadUrl("about:blank")
+        webView.destroy()
     }
 
     fun release() {
@@ -144,7 +146,7 @@ class TerminalBridge(
     }
 
     private fun connect() {
-        if (opened) return
+        if (!attached.get() || opened) return
         opened = true
         // The server always replays scrollback history on a fresh /ws attach,
         // reconnect included, since it has no way to tell the two apart. A
@@ -175,7 +177,7 @@ class TerminalBridge(
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
         opened = false
         main.postDelayed({
-            if (ready.get()) {
+            if (attached.get() && ready.get()) {
                 opened = false
                 connect()
             }
@@ -200,11 +202,13 @@ class TerminalBridge(
      * a quote nor a backslash.
      */
     private fun write(b64: String) {
+        if (!attached.get()) return
         var at = 0
         while (at < b64.length) {
             val end = minOf(at + CHUNK_CHARS, b64.length)
             val piece = b64.substring(at, end)
             main.post {
+                if (!attached.get()) return@post
                 webView.evaluateJavascript("window.termWrite && window.termWrite('" + piece + "')", null)
             }
             at = end
@@ -214,20 +218,27 @@ class TerminalBridge(
     inner class Js {
         @JavascriptInterface
         fun onReady(cols: Int, rows: Int) {
+            if (!attached.get()) return
             lastCols = cols.coerceAtLeast(20)
             lastRows = rows.coerceAtLeast(8)
             ready.set(true)
-            main.post { connect() }
+            main.post {
+                if (attached.get()) connect()
+            }
         }
 
         @JavascriptInterface
         fun onSize(cols: Int, rows: Int) {
-            main.post { resize(cols, rows) }
+            main.post {
+                if (attached.get()) resize(cols, rows)
+            }
         }
 
         @JavascriptInterface
         fun onText(text: String?) {
-            main.post { deliverText(text ?: "") }
+            main.post {
+                if (attached.get()) deliverText(text ?: "")
+            }
         }
 
         @JavascriptInterface
