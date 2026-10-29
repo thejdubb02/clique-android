@@ -130,6 +130,9 @@
     <string name="diff">Diff</string>
     <string name="transcript">Transcript</string>
     <string name="notes">Notes</string>
+    <string name="model">Model</string>
+    <string name="model_pick">Switch model</string>
+    <string name="model_open_picker">Open the CLI\'s own picker</string>
     <string name="diff_not_repo">Not a git repository.</string>
     <string name="diff_empty">No changes.</string>
     <string name="diff_truncated">Truncated.</string>
@@ -150,4 +153,10 @@
     <string name="share_no_server">Pair a server in CLIque first.</string>
     <string name="share_no_sessions">No running sessions to add it to.</string>
     <string name="share_added">Image path added to %1$s\'s prompt draft</string>
+    <string name="file_truncated">(Only the start of the file is shown.)</string>
+    <string name="file_unreadable">Could not show that file.</string>
+    <string name="file_refused">Can\'t open that here: %1$s</string>
+    <string name="file_binary">That file is not text or an image.</string>
+    <string name="file_missing">That file does not exist.</string>
+    <string name="copy_path">Copy path</string>
 </resources>

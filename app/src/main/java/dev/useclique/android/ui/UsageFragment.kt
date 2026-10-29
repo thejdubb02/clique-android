@@ -102,15 +102,15 @@ class UsageFragment : Fragment() {
         val pad = dp(16f)
         for (entry in usage) {
             items.addView(cliTitle(entry.cli), rowLp(top = pad))
+            // A failed refresh can still carry the last good windows: show both.
+            for (window in entry.windows) {
+                items.addView(windowRow(window), rowLp(top = dp(6f)))
+            }
             if (entry.error.isNotBlank()) {
                 val err = TextView(requireContext())
                 err.text = getString(R.string.usage_error, entry.error)
                 err.setTextColor(ContextCompat.getColor(requireContext(), R.color.error))
                 items.addView(err, rowLp())
-                continue
-            }
-            for (window in entry.windows) {
-                items.addView(windowRow(window), rowLp(top = dp(6f)))
             }
         }
     }

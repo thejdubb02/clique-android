@@ -116,6 +116,21 @@ console.log("a drag turns into whole rows");
         s(50, 0).lines === 0 && s(50, 0).rest === 50, s(50, 0));
 }
 
+console.log("a flick slows down and stops");
+{
+  const body = extract(html, "termFlingStep");
+  const f = new Function("window", body + "\nreturn window.termFlingStep;")({});
+  const one = f(2, 16, 0.95);
+  check("one frame moves in the flick's direction and slows",
+        one.px > 0 && one.velocity < 2 && one.velocity > 1.8, one);
+  check("a flick back through history moves the other way", f(-2, 16, 0.95).px < 0);
+  let v = 2, frames = 0, total = 0;
+  while (v && frames < 1000) { const s = f(v, 16, 0.95); v = s.velocity; total += s.px; frames++; }
+  check("and it ends on its own within a few seconds", v === 0 && frames < 200, frames);
+  check("having travelled a long way, not a row or two", total > 300, total);
+  check("a crawl does not fling at all", f(0.01, 16, 0.95).velocity === 0);
+}
+
 /* The pane must not move because somebody asked to read it. */
 console.log("reading the pane does not disturb it");
 {
@@ -179,6 +194,36 @@ console.log("URLs the pane printed");
 
   check("termLinks is on the page the way termText is",
         extract(html, "termLinks").indexOf("window.termLinks") === 0);
+}
+
+console.log("file paths the pane printed");
+{
+  const termLinks = loadTermLinks();
+  const row = (text) => termLinks([{ y: 1, text: text }], 1);
+  const one = (text) => { const r = row(text).filter((l) => l.path); return r.length === 1 ? r[0].url : r; };
+
+  check("an absolute path after a label is a path link",
+        one("Drafts: /tmp/claude-0/x/scratchpad/replies-4.md") === "/tmp/claude-0/x/scratchpad/replies-4.md",
+        row("Drafts: /tmp/claude-0/x/scratchpad/replies-4.md"));
+  check("a home path is a path link", one("saved ~/notes/today.txt") === "~/notes/today.txt");
+  check("a relative path with a folder and extension is a path link",
+        one("wrote .claude-images/paste-1.png") === ".claude-images/paste-1.png");
+  check("a trailing line number is left off", one("see src/app.py:12") === "src/app.py");
+  check("a trailing period is left to the sentence", one("open /etc/hosts.") === "/etc/hosts");
+  check("a slash command is not a path", row("type /model to switch").length === 0, row("type /model to switch"));
+  check("README.md alone is not a path", row("edit README.md now").length === 0);
+  check("and/or is not a path", row("this and/or that").length === 0, row("this and/or that"));
+  const url = row("see https://example.com/foo/bar.md");
+  check("a URL stays one URL, not a URL and a path",
+        url.length === 1 && !url[0].path && url[0].url === "https://example.com/foo/bar.md", url);
+  const bare = row("repo at fdroid.useclique.dev/repo/index.html");
+  check("a scheme-less host stays a URL", bare.length === 1 && !bare[0].path, bare);
+  check("file: and javascript: text is not a path link",
+        row("file:/tmp/r.txt javascript:/tmp/x.txt").filter((l) => l.path).length === 0,
+        row("file:/tmp/r.txt javascript:/tmp/x.txt"));
+  const two = row("cp /a/b.txt /c/d.txt");
+  check("two paths on a row are two links",
+        two.length === 2 && two[0].url === "/a/b.txt" && two[1].url === "/c/d.txt", two);
 }
 
 console.log("underlines for URLs you can see");

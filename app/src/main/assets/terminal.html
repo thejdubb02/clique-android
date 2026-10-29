@@ -19,6 +19,23 @@
       position: absolute;
       inset: 4px 6px;
     }
+    /* Back to the live end after scrolling up. Outside #term, so a tap on it
+       is not also a drag on the pane. Thumb-sized. */
+    #tobottom {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid #5FA8F5;
+      background: #161B22;
+      color: #5FA8F5;
+      font-size: 22px;
+      line-height: 1;
+      display: none;
+    }
+    #tobottom.on { display: block; }
     /* xterm's hidden textarea is an IME target. This app's prompt is a native
        EditText. If this field can take focus, Gboard types into the pane. */
     .xterm-helper-textarea,
@@ -30,6 +47,7 @@
 </head>
 <body>
   <div id="term"></div>
+  <button id="tobottom" type="button" aria-label="Jump to the latest output">&#8595;</button>
   <script src="vendor/xterm.js"></script>
   <script src="vendor/addon-fit.js"></script>
   <script src="vendor/addon-unicode11.js"></script>
@@ -78,6 +96,16 @@
       return { lines: lines, rest: accumPx - lines * rowPx };
     };
 
+    /* A flick keeps going after the finger lifts and slows down on its own.
+       Velocity in px/ms, decayed by `friction` per 16 ms frame. Pure, for
+       tools/terminal_check.js. Returns the pixels to move this frame and the
+       velocity left after it; 0 means stop. */
+    window.termFlingStep = (velocity, dtMs, friction) => {
+      const v = velocity * Math.pow(friction, dtMs / 16);
+      if (Math.abs(v) < 0.02) return { px: 0, velocity: 0 };
+      return { px: v * dtMs, velocity: v };
+    };
+
     /* Touch scrolling, which xterm does not do for us.
      *
      * xterm draws .xterm-screen on top of .xterm-viewport, so a finger lands
@@ -88,35 +116,83 @@
      * not move at all: measured on a device with 300 lines of output, a flick
      * and a slow drag, and byte-identical screenshots either way.
      *
-     * One finger, one row per row-height dragged, no momentum. Predictable
-     * beats clever on a pane someone is trying to read. Dragging down goes
-     * back through the scrollback, the way a page does. */
+     * One finger, one row per row-height dragged. Dragging down goes back
+     * through the scrollback, the way a page does. A flick carries on with
+     * momentum (2026-10-29: row by row made a long reply a dozen drags to get
+     * back through); any new touch stops it dead. */
     (() => {
       const el = term.element || document.getElementById('term');
       if (!el) return;
       let lastY = null;
       let accum = 0;
+      let samples = [];
+      let flingFrame = 0;
       const rowPx = () => {
         const h = el.clientHeight;
         return term.rows > 0 && h > 0 ? h / term.rows : 0;
       };
-      const stop = () => { lastY = null; accum = 0; };
+      const move = (px) => {
+        const step = window.termScrollStep(accum + px, rowPx());
+        accum = step.rest;
+        if (step.lines !== 0) term.scrollLines(step.lines);
+      };
+      const endFling = () => {
+        if (flingFrame) cancelAnimationFrame(flingFrame);
+        flingFrame = 0;
+      };
+      const stop = () => { lastY = null; accum = 0; samples = []; };
+      const fling = () => {
+        // Speed over the last 80 ms of the drag, so a drag that paused
+        // before lifting does not fling.
+        const now = performance.now();
+        const recent = samples.filter((p) => now - p.t < 80);
+        lastY = null;
+        samples = [];
+        if (recent.length < 2) return;
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        let velocity = b.t > a.t ? (a.y - b.y) / (b.t - a.t) : 0;
+        let last = now;
+        const frame = (t) => {
+          const step = window.termFlingStep(velocity, Math.max(1, t - last), 0.95);
+          last = t;
+          velocity = step.velocity;
+          if (!velocity) { flingFrame = 0; accum = 0; return; }
+          move(step.px);
+          flingFrame = requestAnimationFrame(frame);
+        };
+        flingFrame = requestAnimationFrame(frame);
+      };
       el.addEventListener('touchstart', (e) => {
+        endFling();
         if (e.touches.length !== 1) return stop();
         lastY = e.touches[0].clientY;
         accum = 0;
+        samples = [{ t: performance.now(), y: lastY }];
       }, { passive: true });
       el.addEventListener('touchmove', (e) => {
         if (lastY === null || e.touches.length !== 1) return;
         const y = e.touches[0].clientY;
-        accum += lastY - y;
+        move(lastY - y);
         lastY = y;
-        const step = window.termScrollStep(accum, rowPx());
-        accum = step.rest;
-        if (step.lines !== 0) term.scrollLines(step.lines);
+        samples.push({ t: performance.now(), y: y });
+        if (samples.length > 12) samples.shift();
       }, { passive: true });
-      el.addEventListener('touchend', stop, { passive: true });
+      el.addEventListener('touchend', fling, { passive: true });
       el.addEventListener('touchcancel', stop, { passive: true });
+
+      const toBottom = document.getElementById('tobottom');
+      const showToBottom = () => {
+        const buf = term.buffer.active;
+        toBottom.classList.toggle('on', buf.viewportY < buf.baseY);
+      };
+      toBottom.addEventListener('click', () => {
+        endFling();
+        term.scrollToBottom();
+        showToBottom();
+      });
+      term.onScroll(showToBottom);
+      term.onRender(showToBottom);
     })();
 
     const reportSize = () => {
@@ -172,7 +248,8 @@
      * second matcher that would drift. The wrap helpers exist because
      * xterm only asks about one row at a time. Assigned onto window so
      * tools/terminal_check.js can pull them out. Only http and https:
-     * the pane is remote output, so javascript: and file: stay text. */
+     * the pane is remote output, so javascript: and file: stay text.
+     * File paths are links too, opened through the server's file view. */
     const LINK_RE = /\bhttps?:\/\/[^\s"'`<>]+/g;
 
     /* A URL that wraps is still one URL. xterm only asks about one row at a
@@ -272,9 +349,7 @@
       return out;
     }
 
-    /* Where the captured host starts in the joined line. Named for the panel's
-     * copy, which also uses it for file paths; this app has no file view, so
-     * paths stay text and only the host half came across. */
+    /* Where the captured host or path starts in the joined line. */
     function pathRange(line, full, captured) {
       const start = line.indexOf(captured, Math.max(0, full.index));
       const at = start >= 0 ? start : full.index + (full[0].length - captured.length);
@@ -303,7 +378,34 @@
       return out;
     }
 
+    /* A file path the pane printed: "/tmp/x/replies-4.md", "~/notes.txt",
+     * ".claude-images/paste-1.png". Same leading-character rule as BARE_RE, so
+     * the tail of a URL is never taken for a path. An absolute or ~ path needs
+     * a second segment, which keeps a lone "/" or "/model" out; a relative one
+     * needs a folder and an extension. The pane only names it; the server
+     * decides what may be read. Pure: tools/terminal_check.js. */
+    const PATH_RE = /(?:^|[\s"'`=(\[<])((?:~|\.{0,2})\/[\w.@+-]+(?:\/[\w.@+-]+)+|[\w.@+-]+(?:\/[\w.@+-]+)*\/[\w@+-][\w.@+-]*\.[A-Za-z0-9]{1,8})/g;
+
+    function panePathLinks(parts, lineNumber) {
+      const text = paneRowsText(parts);
+      const out = [];
+      PATH_RE.lastIndex = 0;
+      let match;
+      while ((match = PATH_RE.exec(text)) !== null) {
+        const raw = trimUrl(match[1]);
+        if (!raw || raw.startsWith("//")) continue;
+        const at = pathRange(text, match, raw);
+        for (const seg of paneUrlSegments(parts, at.start - 1, raw.length)) {
+          if (seg.y !== lineNumber) continue;
+          out.push({ url: raw, path: true, x0: seg.x0, x1: seg.x1, y: seg.y });
+        }
+      }
+      return out;
+    }
+
     window.LINK_RE = LINK_RE;
+    window.PATH_RE = PATH_RE;
+    window.panePathLinks = panePathLinks;
     window.BARE_RE = BARE_RE;
     window.trimUrl = trimUrl;
     window.paneLineWrapped = paneLineWrapped;
@@ -326,6 +428,10 @@
         }
       }
       for (const hit of paneBareLinks(parts, lineNumber)) links.push(hit);
+      for (const hit of panePathLinks(parts, lineNumber)) {
+        // A host+path like fdroid.useclique.dev/repo is already a URL.
+        if (!links.some((l) => l.y === hit.y && hit.x0 <= l.x1 && hit.x1 >= l.x0)) links.push(hit);
+      }
       return links;
     };
 
@@ -339,7 +445,7 @@
         // termLinks keeps only the slice that falls on `line`, so walking the
         // viewport row by row cannot produce the same span twice.
         for (const hit of window.termLinks(parts, line)) {
-          out.push({ y: hit.y, x0: hit.x0, x1: hit.x1, url: hit.url });
+          out.push({ y: hit.y, x0: hit.x0, x1: hit.x1, url: hit.url, path: !!hit.path });
         }
       }
       return out;
@@ -360,7 +466,8 @@
               text: hit.url,
               decorations: { underline: true, pointerCursor: true },
               activate(event, uri) {
-                window.CliqueBridge && CliqueBridge.onUrl(uri);
+                if (!window.CliqueBridge) return;
+                if (hit.path) CliqueBridge.onPath(uri); else CliqueBridge.onUrl(uri);
               },
             });
           }

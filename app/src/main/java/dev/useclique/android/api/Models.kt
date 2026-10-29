@@ -33,6 +33,10 @@ data class Session(
     val archived: Boolean = false,
     val branch: String = "",
     val draft: String = "",
+    /** One-tap model switch: send [modelCmd] with `{model}` filled in from
+     *  [models], or as typed when [models] is empty (opens the CLI's picker). */
+    val models: List<String> = emptyList(),
+    val modelCmd: String = "",
 )
 
 data class BarSnippet(
@@ -166,6 +170,10 @@ fun parseState(raw: JSONObject): PanelState {
             archived = it.optBoolean("archived"),
             branch = it.optStr("branch"),
             draft = it.optStr("draft"),
+            models = it.optJSONArray("models")?.let { arr ->
+                (0 until arr.length()).map { i -> arr.optString(i) }.filter { m -> m.isNotBlank() }
+            } ?: emptyList(),
+            modelCmd = it.optStr("model_cmd"),
         )
     } ?: emptyList()
 

@@ -41,6 +41,7 @@ class TerminalBridge(
 
     /** A URL the pane asked to open. The bridge does not know what an Intent is. */
     var onOpenUrl: ((String) -> Unit)? = null
+    var onOpenPath: ((String) -> Unit)? = null
 
     fun attach() {
         attached.set(true)
@@ -235,6 +236,15 @@ class TerminalBridge(
                 if (!attached.get()) return@post
                 val u = url ?: return@post
                 onOpenUrl?.invoke(u)
+            }
+        }
+
+        @JavascriptInterface
+        fun onPath(path: String?) {
+            main.post {
+                if (!attached.get()) return@post
+                val p = path ?: return@post
+                onOpenPath?.invoke(p)
             }
         }
     }

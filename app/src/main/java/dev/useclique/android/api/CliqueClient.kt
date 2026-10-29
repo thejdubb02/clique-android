@@ -178,6 +178,22 @@ class CliqueClient(
         return parsePaste(JSONObject(authed("api/sessions/$id/paste").post(payload)))
     }
 
+    /* A path the pane printed, as the server sees it. The server fences what
+       may be read and says why when it refuses, so nothing is checked here. */
+    fun file(sessionId: String, path: String): JSONObject =
+        JSONObject(authedQuery("api/sessions/$sessionId/file", "path" to path).get())
+
+    fun fileBytes(sessionId: String, path: String): ByteArray {
+        val u = url("api/sessions/$sessionId/file").newBuilder()
+            .addQueryParameter("path", path)
+            .addQueryParameter("raw", "1")
+            .build()
+        http.newCall(authedRequest(u).get().build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw ApiException(resp.code, "")
+            return resp.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
     fun prompts(limit: Int): List<Prompt> {
         val body = authedQuery("api/prompts", "limit" to limit.toString()).get()
         return parsePrompts(JSONArray(body))

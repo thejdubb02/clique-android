@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -26,6 +27,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -40,6 +42,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +70,8 @@ class SessionFragment : Fragment() {
     private lateinit var sessionId: String
     private var bridge: TerminalBridge? = null
     private var sessionName: String = ""
+    private var models: List<String> = emptyList()
+    private var modelCmd: String = ""
     private lateinit var prompt: EditText
     private lateinit var toolbar: androidx.appcompat.widget.Toolbar
     private val handler = Handler(Looper.getMainLooper())
@@ -136,6 +141,7 @@ class SessionFragment : Fragment() {
         toolbar.inflateMenu(R.menu.session)
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.model -> showModelPicker()
                 R.id.history -> showPromptHistory()
                 R.id.selectText -> {
                     bridge?.readText(SELECT_TEXT_LINES) { text ->
@@ -234,6 +240,7 @@ class SessionFragment : Fragment() {
             if (!isAdded) return@launch
             bridge = TerminalBridge(web, client, sessionId).also {
                 it.onOpenUrl = { url -> if (isAdded) openUrl(url) }
+                it.onOpenPath = { path -> if (isAdded) showFile(path) }
                 it.attach()
             }
         }
@@ -324,6 +331,9 @@ class SessionFragment : Fragment() {
             knownDraft = session.draft
         }
         sessionName = session.name
+        models = session.models
+        modelCmd = session.modelCmd
+        toolbar.menu.findItem(R.id.model)?.isVisible = modelCmd.isNotBlank()
         toolbar.title = session.name
         toolbar.subtitle = session.cliLabel
         val banner = view?.findViewById<View>(R.id.permission_banner) ?: return
@@ -414,6 +424,25 @@ class SessionFragment : Fragment() {
         }
     }
 
+    // The CLI's own command, typed for you: a list when clis.toml names the
+    // models, and the last row (or the only action) opens the CLI's picker.
+    private fun showModelPicker() {
+        val cmd = modelCmd
+        if (cmd.isBlank()) return
+        val bare = cmd.replace("{model}", "").trim()
+        if (models.isEmpty() || !cmd.contains("{model}")) {
+            sendText(bare)
+            return
+        }
+        val rows = models + getString(R.string.model_open_picker)
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.model_pick)
+            .setItems(rows.toTypedArray()) { _, which ->
+                sendText(if (which < models.size) cmd.replace("{model}", models[which]) else bare)
+            }
+            .show()
+    }
+
     // Same path as Send — a tapped snippet is text landing in the pane right
     // away, not something dropped in the box first.
     private fun sendText(text: String, onFailure: () -> Unit = {}) {
@@ -439,6 +468,82 @@ class SessionFragment : Fragment() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safe)))
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(requireContext(), R.string.url_cannot_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /* A path the pane printed, read through the server's file view. Text in a
+       scrolling, selectable box; an image as an image; anything else says
+       what it is. The server decides what may be read. */
+    private fun showFile(path: String) {
+        val act = activity as? MainActivity ?: return
+        val server = act.app.store.get(serverId) ?: return
+        val client = CliqueClient.forServer(server, act.app.store.token(serverId))
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val info = withContext(Dispatchers.IO) { client.file(sessionId, path) }
+                if (!isAdded) return@launch
+                val ctx = requireContext()
+                val pad = (12 * resources.displayMetrics.density).toInt()
+                val body: View = when (info.optString("kind")) {
+                    "text" -> ScrollView(ctx).apply {
+                        addView(TextView(ctx).apply {
+                            text = info.optString("text") +
+                                if (info.optBoolean("truncated")) "\n\n" + getString(R.string.file_truncated) else ""
+                            typeface = Typeface.MONOSPACE
+                            setTextIsSelectable(true)
+                            setPadding(pad, pad, pad, pad)
+                        })
+                    }
+                    "image" -> {
+                        val bytes = withContext(Dispatchers.IO) { client.fileBytes(sessionId, path) }
+                        // A camera-sized PNG is ~50 MB as a bitmap; shrink before decoding.
+                        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+                        o.inSampleSize = 1
+                        while (maxOf(o.outWidth, o.outHeight) / o.inSampleSize > 2048) o.inSampleSize *= 2
+                        o.inJustDecodeBounds = false
+                        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+                        if (bmp == null) TextView(ctx).apply { setText(R.string.file_unreadable); setPadding(pad, pad, pad, pad) }
+                        else ScrollView(ctx).apply {
+                            addView(ImageView(ctx).apply {
+                                setImageBitmap(bmp)
+                                adjustViewBounds = true
+                            })
+                        }
+                    }
+                    "dir" -> TextView(ctx).apply {
+                        val entries = info.optJSONArray("entries")
+                        text = (0 until (entries?.length() ?: 0)).joinToString("\n") { i ->
+                            val e = entries!!.getJSONObject(i)
+                            e.optString("name") + if (e.optString("kind") == "dir") "/" else ""
+                        }
+                        typeface = Typeface.MONOSPACE
+                        setPadding(pad, pad, pad, pad)
+                    }
+                    else -> TextView(ctx).apply {
+                        val err = info.optString("error")
+                        text = when {
+                            err.isNotEmpty() -> getString(R.string.file_refused, err)
+                            info.optString("kind") == "binary" -> getString(R.string.file_binary)
+                            else -> getString(R.string.file_missing)
+                        }
+                        setPadding(pad, pad, pad, pad)
+                    }
+                }
+                AlertDialog.Builder(ctx)
+                    .setTitle(info.optString("name").ifEmpty { path })
+                    .setView(body)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .setNeutralButton(R.string.copy_path) { _, _ ->
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("path", info.optString("path").ifEmpty { path }))
+                    }
+                    .show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (isAdded) Toast.makeText(requireContext(), e.message ?: getString(R.string.file_unreadable), Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
