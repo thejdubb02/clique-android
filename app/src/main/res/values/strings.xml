@@ -148,6 +148,7 @@
     <string name="usage_label_percent_reset">%1$s · %2$d%% · %3$s</string>
     <string name="usage_resets_now">resets now</string>
     <string name="usage_resets_in">resets %1$s</string>
+    <string name="usage_checked">checked %1$s</string>
     <string name="could_not_load">Could not load.</string>
     <string name="share_pick_session">Add image to which session?</string>
     <string name="share_no_server">Pair a server in CLIque first.</string>

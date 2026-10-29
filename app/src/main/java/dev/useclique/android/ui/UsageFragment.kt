@@ -25,10 +25,9 @@ import dev.useclique.android.R
 import dev.useclique.android.api.CliUsage
 import dev.useclique.android.api.CliqueClient
 import dev.useclique.android.api.UsageWindow
-import java.text.ParseException
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
+import dev.useclique.android.api.resetMillis
+import kotlinx.coroutines.delay
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 class UsageFragment : Fragment() {
 
@@ -38,6 +37,7 @@ class UsageFragment : Fragment() {
     private lateinit var message: TextView
     private lateinit var error: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var refresh: SwipeRefreshLayout
     private val pulses = ArrayList<ValueAnimator>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +60,12 @@ class UsageFragment : Fragment() {
         message = view.findViewById(R.id.message)
         error = view.findViewById(R.id.error)
         progress = view.findViewById(R.id.progress)
-        load()
+        refresh = view.findViewById(R.id.refresh)
+        refresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.accent))
+        // The child is a FrameLayout, so ask the list whether it can still scroll up.
+        refresh.setOnChildScrollUpCallback { _, _ -> scroller.isShown && scroller.canScrollVertically(-1) }
+        refresh.setOnRefreshListener { load(refresh = true) }
+        load(refresh = false)
     }
 
     override fun onDestroyView() {
@@ -68,32 +73,45 @@ class UsageFragment : Fragment() {
         super.onDestroyView()
     }
 
-    private fun load() {
+    private fun load(refresh: Boolean) {
         val act = activity as MainActivity
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val usage = withContext(Dispatchers.IO) {
-                    CliqueClient.forServer(server, token).usage()
-                }
-                if (!isAdded) return@launch
-                progress.visibility = View.GONE
-                if (usage.isEmpty()) {
-                    message.visibility = View.VISIBLE
-                } else {
-                    bind(usage)
-                    scroller.visibility = View.VISIBLE
+                val client = CliqueClient.forServer(server, token)
+                var usage = withContext(Dispatchers.IO) { client.usage(refresh) }
+                show(usage)
+                // The panel answers a stale reading at once and probes behind it,
+                // so one quiet look a few seconds later picks up the fresh numbers.
+                if (!refresh && usage.any { it.checked > 0 && isStale(it.checked) }) {
+                    delay(STALE_RECHECK_MS)
+                    usage = withContext(Dispatchers.IO) { client.usage() }
+                    show(usage)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (!isAdded) return@launch
                 progress.visibility = View.GONE
+                this@UsageFragment.refresh.isRefreshing = false
+                if (scroller.isShown) return@launch // one blip does not wipe good bars
+                scroller.visibility = View.GONE
+                message.visibility = View.GONE
                 error.text = e.message ?: getString(R.string.could_not_load)
                 error.visibility = View.VISIBLE
             }
         }
+    }
+
+    private fun show(usage: List<CliUsage>) {
+        if (!isAdded) return
+        progress.visibility = View.GONE
+        refresh.isRefreshing = false
+        error.visibility = View.GONE
+        message.visibility = if (usage.isEmpty()) View.VISIBLE else View.GONE
+        scroller.visibility = if (usage.isEmpty()) View.GONE else View.VISIBLE
+        bind(usage)
     }
 
     private fun bind(usage: List<CliUsage>) {
@@ -102,6 +120,18 @@ class UsageFragment : Fragment() {
         val pad = dp(16f)
         for (entry in usage) {
             items.addView(cliTitle(entry.cli), rowLp(top = pad))
+            // Only an old reading says how old: a fresh one needs no caption.
+            if (entry.checked > 0 && isStale(entry.checked)) {
+                val checked = TextView(requireContext())
+                val at = entry.checked * 1000
+                checked.text = getString(
+                    R.string.usage_checked,
+                    DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+                )
+                checked.setTextColor(ContextCompat.getColor(requireContext(), R.color.muted))
+                checked.textSize = 12f
+                items.addView(checked, rowLp())
+            }
             // A failed refresh can still carry the last good windows: show both.
             for (window in entry.windows) {
                 items.addView(windowRow(window), rowLp(top = dp(6f)))
@@ -173,12 +203,7 @@ class UsageFragment : Fragment() {
     }
 
     private fun untilReset(resetsAt: String): String? {
-        if (resetsAt.isBlank()) return null
-        val then = try {
-            ISO.parse(resetsAt)?.time ?: return null
-        } catch (_: ParseException) {
-            return null
-        }
+        val then = resetMillis(resetsAt) ?: return null
         val now = System.currentTimeMillis()
         if (then <= now) return getString(R.string.usage_resets_now)
         return getString(R.string.usage_resets_in, DateUtils.getRelativeTimeSpanString(then, now, DateUtils.MINUTE_IN_MILLIS))
@@ -197,9 +222,11 @@ class UsageFragment : Fragment() {
 
     companion object {
         private const val ARG_SERVER = "serverId"
-        private val ISO = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
+        // The panel's own cache lives five minutes (usage.TTL).
+        private const val STALE_SECONDS = 300L
+        private const val STALE_RECHECK_MS = 4000L
+
+        fun isStale(checkedSeconds: Long) = System.currentTimeMillis() / 1000 - checkedSeconds >= STALE_SECONDS
 
         fun newInstance(serverId: String) = UsageFragment().apply {
             arguments = Bundle().apply {

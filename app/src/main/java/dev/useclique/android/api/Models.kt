@@ -290,7 +290,26 @@ data class CliUsage(
     val cli: String,
     val windows: List<UsageWindow>,
     val error: String,
+    // Unix seconds of the last probe that answered; 0 when the panel never said.
+    val checked: Long = 0,
 )
+
+/**
+ * A reset time as epoch millis, or null. Vendors answer with an offset, a "Z",
+ * fractional seconds, or none of those; a time with no offset is taken as UTC.
+ */
+fun resetMillis(iso: String): Long? {
+    if (iso.isBlank()) return null
+    return try {
+        java.time.OffsetDateTime.parse(iso).toInstant().toEpochMilli()
+    } catch (_: java.time.format.DateTimeParseException) {
+        try {
+            java.time.LocalDateTime.parse(iso).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        } catch (_: java.time.format.DateTimeParseException) {
+            null
+        }
+    }
+}
 
 fun parseUsage(raw: JSONObject): List<CliUsage> {
     val arr = raw.optJSONArray("usage") ?: JSONArray()
@@ -306,6 +325,7 @@ fun parseUsage(raw: JSONObject): List<CliUsage> {
             cli = entry.optStr("cli"),
             windows = windows,
             error = entry.optStr("error"),
+            checked = entry.optLong("checked", 0),
         )
     }
 }

@@ -129,8 +129,10 @@ class CliqueClient(
         return parseNotes(JSONObject(authed("api/sessions/$sessionId/notes").get()))
     }
 
-    fun usage(): List<CliUsage> {
-        return parseUsage(JSONObject(authedQuery("api/usage", "all" to "1").get()))
+    // refresh asks the panel to probe now rather than answer from its cache.
+    fun usage(refresh: Boolean = false): List<CliUsage> {
+        val params = if (refresh) arrayOf("all" to "1", "refresh" to "1") else arrayOf("all" to "1")
+        return parseUsage(JSONObject(authedQuery("api/usage", *params).get()))
     }
 
     fun postNotes(sessionId: String, itemsJson: JSONArray) {
