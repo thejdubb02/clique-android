@@ -27,7 +27,7 @@ class CliqueClient(
         val req = Request.Builder().url(url("healthz")).get().build()
         http.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) return false
-            val body = resp.body?.string().orEmpty()
+            val body = resp.body.cappedString()
             return try {
                 JSONObject(body).optBoolean("ok")
             } catch (_: Exception) {
@@ -46,7 +46,7 @@ class CliqueClient(
             .post(payload.toRequestBody(JSON))
             .build()
         http.newCall(req).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
+            val body = resp.body.cappedString()
             if (resp.code != 201) throw ApiException(resp.code, body)
             val o = JSONObject(body)
             return Claim(
@@ -192,7 +192,7 @@ class CliqueClient(
             .build()
         http.newCall(authedRequest(u).get().build()).execute().use { resp ->
             if (!resp.isSuccessful) throw ApiException(resp.code, "")
-            return resp.body?.bytes() ?: ByteArray(0)
+            return resp.body.capped(MAX_FILE_BYTES)
         }
     }
 
@@ -208,7 +208,7 @@ class CliqueClient(
             .build()
         val req = authedRequest(u).get().build()
         waitHttp.newCall(req).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
+            val body = resp.body.cappedString()
             if (!resp.isSuccessful) throw ApiException(resp.code, body)
             return JSONObject(body)
         }
@@ -273,7 +273,7 @@ class CliqueClient(
 
     private fun execute(request: Request, expected: Int? = null): String {
         http.newCall(request).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
+            val body = resp.body.cappedString()
             val ok = if (expected != null) resp.code == expected else resp.isSuccessful
             if (!ok) throw ApiException(resp.code, body)
             return body

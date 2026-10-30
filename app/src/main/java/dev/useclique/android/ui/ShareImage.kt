@@ -13,6 +13,7 @@ import dev.useclique.android.api.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.useclique.android.api.readUpTo
 import java.io.IOException
 import java.io.InputStream
 
@@ -20,17 +21,7 @@ import java.io.InputStream
 // with a sentence rather than a 413 nobody sees.
 const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
-fun readImageBytes(input: InputStream): ByteArray {
-    val bytes = ByteArray(MAX_IMAGE_BYTES + 1)
-    var used = 0
-    while (used < bytes.size) {
-        val read = input.read(bytes, used, bytes.size - used)
-        if (read < 0) break
-        if (read == 0) continue
-        used += read
-    }
-    return bytes.copyOf(used)
-}
+fun readImageBytes(input: InputStream): ByteArray = readUpTo(input, MAX_IMAGE_BYTES)
 
 fun imageName(resolver: ContentResolver, uri: Uri): String {
     val shown = try {
