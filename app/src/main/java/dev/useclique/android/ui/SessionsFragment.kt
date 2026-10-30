@@ -65,7 +65,9 @@ class SessionsFragment : Fragment() {
     private val answeredUntil = HashMap<String, Long>()
     private val expanded = HashSet<String>()
     private val peekText = HashMap<String, String>()
-    private val peeking = HashSet<String>()
+    // Session id to the generation of its one in-flight peek.
+    private val peeking = HashMap<String, Int>()
+    private var peekGen = 0
     private val handler = Handler(Looper.getMainLooper())
     private val poll = object : Runnable {
         override fun run() {
@@ -138,6 +140,7 @@ class SessionsFragment : Fragment() {
         // A request still out belongs to the dead view; the next view must poll.
         loadGen++
         loading = false
+        peeking.clear()
         super.onDestroyView()
     }
 
@@ -246,7 +249,7 @@ class SessionsFragment : Fragment() {
         for (session in state.sessions) liveIds.add(session.id)
         expanded.retainAll(liveIds)
         peekText.keys.retainAll(liveIds)
-        peeking.retainAll(liveIds)
+        peeking.keys.retainAll(liveIds)
         list.adapter?.notifyDataSetChanged()
         when {
             state.sessions.isEmpty() -> {
@@ -271,19 +274,23 @@ class SessionsFragment : Fragment() {
         val act = activity as? MainActivity ?: return
         val server = act.app.store.get(serverId) ?: return
         val token = act.app.store.token(serverId)
-        if (!peeking.add(id)) return
+        if (id in peeking) return
+        val gen = ++peekGen
+        peeking[id] = gen
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val lines = withContext(Dispatchers.IO) {
                     CliqueClient.forServer(server, token).peek(id, 4)
                 }
+                // Dropped or cleared while out: a newer request owns this id now.
+                if (peeking[id] != gen) return@launch
                 peekText[id] = lines.joinToString("\n")
                 val pos = items.indexOfFirst { it is Item.Row && it.session.id == id }
                 if (pos >= 0) list.adapter?.notifyItemChanged(pos)
             } catch (_: Exception) {
                 // A peek is not worth a toast during a three-second poll.
             } finally {
-                peeking.remove(id)
+                if (peeking[id] == gen) peeking.remove(id)
             }
         }
     }
