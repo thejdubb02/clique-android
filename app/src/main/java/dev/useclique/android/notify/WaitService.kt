@@ -84,9 +84,12 @@ class WaitService : Service() {
                 val matched = result.optBoolean("matched")
                 val state = result.optString("state")
                 if (matched) {
+                    var snippet: SnippetAction? = null
                     val session = if (state == "waiting") {
                         try {
-                            client.state().sessions.firstOrNull { it.id == sessionId }
+                            val panel = client.state()
+                            snippet = firstSnippetAction(panel.barSnippets)
+                            panel.sessions.firstOrNull { it.id == sessionId }
                         } catch (_: Exception) {
                             null
                         }
@@ -99,7 +102,7 @@ class WaitService : Service() {
                             // on screen. onScreen suppression is for "finished";
                             // the in-session banner is often already gone.
                             if (session != null) {
-                                notifyPermission(name, session, serverId, sessionId)
+                                notifyPermission(name, session, serverId, sessionId, snippet)
                             }
                         }
                         WaitNotice.FINISHED -> {
@@ -124,9 +127,9 @@ class WaitService : Service() {
         }
     }
 
-    private fun notifyPermission(name: String, session: Session, serverId: String, sessionId: String) {
+    private fun notifyPermission(name: String, session: Session, serverId: String, sessionId: String, snippet: SnippetAction?) {
         val id = nextId()
-        val notif = permissionNotification(this, name, session.saying, serverId, sessionId, id)
+        val notif = permissionNotification(this, name, session.saying, serverId, sessionId, id, snippet = snippet)
         getSystemService(NotificationManager::class.java).notify(id, notif)
     }
 

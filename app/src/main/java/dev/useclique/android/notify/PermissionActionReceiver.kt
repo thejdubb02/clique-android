@@ -25,16 +25,21 @@ class PermissionActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val serverId = intent.getStringExtra(EXTRA_SERVER_ID) ?: return
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return
-        val key = intent.getStringExtra(EXTRA_KEY) ?: return
+        val key = intent.getStringExtra(EXTRA_KEY)
+        val text = intent.getStringExtra(EXTRA_TEXT)
+        if (key == null && text == null) return
         val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, 0)
         if (notifId == 0) return
         val name = intent.getStringExtra(EXTRA_NAME) ?: sessionId
         val saying = intent.getStringExtra(EXTRA_SAYING).orEmpty()
+        val snippet = intent.getStringExtra(EXTRA_SNIPPET_TEXT)?.let {
+            SnippetAction(intent.getStringExtra(EXTRA_SNIPPET_LABEL).orEmpty(), it)
+        }
         val appContext = context.applicationContext
         val pending = goAsync()
         executor.execute {
             try {
-                send(appContext, serverId, sessionId, key)
+                send(appContext, serverId, sessionId, key, text)
                 appContext.getSystemService(NotificationManager::class.java).cancel(notifId)
             } catch (_: Exception) {
                 appContext.getSystemService(NotificationManager::class.java).notify(
@@ -47,6 +52,7 @@ class PermissionActionReceiver : BroadcastReceiver() {
                         sessionId,
                         notifId,
                         failed = true,
+                        snippet = snippet,
                     ),
                 )
             } finally {
@@ -55,11 +61,12 @@ class PermissionActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun send(context: Context, serverId: String, sessionId: String, key: String) {
+    private fun send(context: Context, serverId: String, sessionId: String, key: String?, text: String?) {
         val app = context as CliqueApp
         val server = app.store.get(serverId) ?: throw IOException("no server")
         val token = app.store.token(serverId) ?: throw IOException("no token")
-        CliqueClient.forServer(server, token).sendKey(sessionId, key)
+        val client = CliqueClient.forServer(server, token)
+        if (text != null) client.send(sessionId, text, enter = true) else client.sendKey(sessionId, key!!)
     }
 
     companion object {
@@ -68,6 +75,9 @@ class PermissionActionReceiver : BroadcastReceiver() {
         const val EXTRA_KEY = "key"
         const val EXTRA_NOTIF_ID = "notifId"
         const val EXTRA_NAME = "name"
+        const val EXTRA_TEXT = "text"
+        const val EXTRA_SNIPPET_LABEL = "snippetLabel"
+        const val EXTRA_SNIPPET_TEXT = "snippetText"
         const val EXTRA_SAYING = "saying"
         const val CHANNEL = "clique-permission"
 
@@ -94,6 +104,7 @@ internal fun permissionNotification(
     sessionId: String,
     notifId: Int,
     failed: Boolean = false,
+    snippet: SnippetAction? = null,
 ): Notification {
     ensurePermissionChannel(context)
     val title = context.getString(R.string.notif_permission, name)
@@ -107,13 +118,20 @@ internal fun permissionNotification(
         .addAction(
             0,
             context.getString(R.string.approve),
-            permissionAction(context, serverId, sessionId, APPROVE_KEY, notifId, name, saying),
+            permissionAction(context, serverId, sessionId, APPROVE_KEY, null, notifId, name, saying, snippet),
         )
         .addAction(
             0,
             context.getString(R.string.deny),
-            permissionAction(context, serverId, sessionId, DENY_KEY, notifId, name, saying),
+            permissionAction(context, serverId, sessionId, DENY_KEY, null, notifId, name, saying, snippet),
         )
+    if (snippet != null) {
+        builder.addAction(
+            0,
+            snippet.label,
+            permissionAction(context, serverId, sessionId, null, snippet.text, notifId, name, saying, snippet),
+        )
+    }
     if (text.isNotEmpty()) {
         builder.setContentText(text)
         if (!failed && saying.isNotEmpty()) {
@@ -127,11 +145,14 @@ private fun permissionAction(
     context: Context,
     serverId: String,
     sessionId: String,
-    key: String,
+    key: String?,
+    text: String?,
     notifId: Int,
     name: String,
     saying: String,
+    snippet: SnippetAction?,
 ): PendingIntent {
+    val kind = key ?: "snippet"
     val intent = Intent(context, PermissionActionReceiver::class.java)
         .setData(
             Uri.Builder()
@@ -139,18 +160,21 @@ private fun permissionAction(
                 .authority("permission-action")
                 .appendPath(serverId)
                 .appendPath(sessionId)
-                .appendPath(key)
+                .appendPath(kind)
                 .build(),
         )
         .putExtra(PermissionActionReceiver.EXTRA_SERVER_ID, serverId)
         .putExtra(PermissionActionReceiver.EXTRA_SESSION_ID, sessionId)
         .putExtra(PermissionActionReceiver.EXTRA_KEY, key)
+        .putExtra(PermissionActionReceiver.EXTRA_TEXT, text)
+        .putExtra(PermissionActionReceiver.EXTRA_SNIPPET_LABEL, snippet?.label)
+        .putExtra(PermissionActionReceiver.EXTRA_SNIPPET_TEXT, snippet?.text)
         .putExtra(PermissionActionReceiver.EXTRA_NOTIF_ID, notifId)
         .putExtra(PermissionActionReceiver.EXTRA_NAME, name)
         .putExtra(PermissionActionReceiver.EXTRA_SAYING, saying)
     return PendingIntent.getBroadcast(
         context,
-        0,
+        actionRequestCode(serverId, sessionId, kind),
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )

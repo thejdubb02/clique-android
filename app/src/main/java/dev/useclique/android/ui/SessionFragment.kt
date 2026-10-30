@@ -96,6 +96,7 @@ class SessionFragment : Fragment() {
     private var draftLoaded = false
     // What was last loaded or saved. A pause that changed nothing must not PATCH.
     private var knownDraft = ""
+    private val saveDraftNow = Runnable { saveDraft() }
     private val poll = object : Runnable {
         override fun run() {
             if (!isResumed) return
@@ -164,6 +165,10 @@ class SessionFragment : Fragment() {
 
 
         prompt = view.findViewById(R.id.prompt_input)
+        prompt.doAfterTextChanged {
+            handler.removeCallbacks(saveDraftNow)
+            handler.postDelayed(saveDraftNow, DRAFT_DEBOUNCE_MS)
+        }
         // A screenshot copied to the clipboard, then long-press "Paste" here:
         // a plain EditText has no text form for that clip and drops it, which
         // is why it didn't paste. Same destination as the attach button —
@@ -258,6 +263,7 @@ class SessionFragment : Fragment() {
     }
 
     override fun onPause() {
+        handler.removeCallbacks(saveDraftNow)
         saveDraft()
         handler.removeCallbacks(poll)
         if (WaitService.onScreen == "$serverId:$sessionId") WaitService.onScreen = null
@@ -289,6 +295,7 @@ class SessionFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        handler.removeCallbacks(saveDraftNow)
         refreshGen++
         refreshing = false
         handler.removeCallbacks(poll)
@@ -621,6 +628,8 @@ class SessionFragment : Fragment() {
         val text = prompt.text.toString()
         if (text.isEmpty()) return
         prompt.text.clear()
+        handler.removeCallbacks(saveDraftNow)
+        saveDraft()
         sendText(text) {
             // The field was cleared optimistically. Put it back rather than
             // making him retype it from a toast.
@@ -882,3 +891,5 @@ class SessionFragment : Fragment() {
         }
     }
 }
+
+const val DRAFT_DEBOUNCE_MS = 1000L

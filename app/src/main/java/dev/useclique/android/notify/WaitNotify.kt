@@ -1,5 +1,6 @@
 package dev.useclique.android.notify
 
+import dev.useclique.android.api.BarSnippet
 import dev.useclique.android.api.Session
 import dev.useclique.android.api.wantsPermission
 
@@ -24,3 +25,18 @@ fun waitNotice(waitState: String, session: Session?): WaitNotice {
     }
     return WaitNotice.FINISHED
 }
+
+/** What the notification's third action sends: [text] then Enter, shown as [label]. */
+data class SnippetAction(val label: String, val text: String)
+
+/** The first bar snippet with text, as the panel's bar would send it; null if none. */
+fun firstSnippetAction(snippets: List<BarSnippet>): SnippetAction? =
+    snippets.firstOrNull { it.text.isNotBlank() }
+        ?.let { SnippetAction(it.label.ifBlank { it.text }, it.text) }
+
+/**
+ * PendingIntent request code for one action button. Includes the server, so two
+ * servers that both have session "s1" never share a code.
+ */
+fun actionRequestCode(serverId: String, sessionId: String, action: String): Int =
+    "$serverId\u0000$sessionId\u0000$action".hashCode()
