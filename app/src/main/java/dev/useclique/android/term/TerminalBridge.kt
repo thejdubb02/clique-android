@@ -12,6 +12,7 @@ import okio.ByteString
 import org.json.JSONObject
 import dev.useclique.android.api.CliqueClient
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Pipes the panel's /ws stream into a local xterm.js WebView.
@@ -26,10 +27,11 @@ class TerminalBridge(
     private val webView: WebView,
     private val client: CliqueClient,
     private val sessionId: String,
-) : WebSocketListener() {
+) {
 
     private val main = Handler(Looper.getMainLooper())
     private var socket: WebSocket? = null
+    private val generation = Generation()
     private val ready = AtomicBoolean(false)
     private val attached = AtomicBoolean(false)
     private var lastCols = 80
@@ -154,7 +156,27 @@ class TerminalBridge(
         // clearing it first the replay appends on top and reads as the last
         // screen repeating itself.
         webView.evaluateJavascript("window.termReset && window.termReset()", null)
-        socket = client.openTerminal(sessionId, lastCols, lastRows, this)
+        // Each socket's listener carries the generation it was opened under, so a
+        // late frame or failure from a replaced socket cannot interleave with the
+        // new socket's replay or schedule a second reconnect.
+        val gen = generation.next()
+        socket = client.openTerminal(sessionId, lastCols, lastRows, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (generation.isCurrent(gen)) write(bytes.base64())
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                if (generation.isCurrent(gen)) write(text.toByteArray(Charsets.UTF_8).let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) })
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(code, reason)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
+                if (generation.isCurrent(gen)) reconnectSoon()
+            }
+        })
     }
 
     private fun sendControl(obj: JSONObject) {
@@ -162,19 +184,7 @@ class TerminalBridge(
         client.sendControl(ws, obj)
     }
 
-    override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-        write(bytes.base64())
-    }
-
-    override fun onMessage(webSocket: WebSocket, text: String) {
-        write(text.toByteArray(Charsets.UTF_8).let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) })
-    }
-
-    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-        webSocket.close(code, reason)
-    }
-
-    override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
+    private fun reconnectSoon() {
         opened = false
         main.postDelayed({
             if (attached.get() && ready.get()) {
@@ -259,4 +269,11 @@ class TerminalBridge(
             }
         }
     }
+}
+
+/** Which socket is the live one. Callbacks from any other are stale. */
+class Generation {
+    private val n = AtomicInteger()
+    fun next(): Int = n.incrementAndGet()
+    fun isCurrent(g: Int): Boolean = g == n.get()
 }
