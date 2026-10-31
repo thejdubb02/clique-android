@@ -100,6 +100,11 @@ class SessionFragment : Fragment() {
     private val poll = object : Runnable {
         override fun run() {
             if (!isResumed) return
+            // Keeps this phone's claim on the pane's width. The server lets it
+            // lapse after 90 s, and then a desktop resizes the pane under you;
+            // every width change makes the CLI redraw into the scrollback, which
+            // is where overlapping replies came from.
+            bridge?.hold()
             refreshState()
             handler.postDelayed(this, 3000)
         }
