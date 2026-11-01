@@ -76,6 +76,9 @@ File browser and editor · artifacts · uploads · storage and purge · webhook 
 · manual reordering · stats and history graphs · the compacting favicon spinner
 (0.79.0 — browser-tab chrome; a native app has no favicon to spin, and the
 underlying signal already reaches the app the same as `waiting`/`error`).
+· terminal line height and letter spacing (CLQ-67; the app draws a fixed
+13px font and ignores the panel's type settings, and on a phone every column
+spacing costs is one the reply needs).
 
 All of them either need a big screen, are administrative rather than
 operational, or are things nobody does standing up.
