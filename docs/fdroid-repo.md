@@ -75,9 +75,10 @@ client looks for an index that is not there and reports "invalid repository".
 Android then asks twice, once each: allow F-Droid to install apps, and Play
 Protect noting it has not seen this app before.
 
-## Known rough edge
+## The repository icon
 
-The repository shows a generated placeholder icon rather than the CLIque one.
-`fdroid update` clears `repo/icons/` at the start of every run, and
-`config/icon.png` is not picked up by 2.4.5 either. The app's own icon is
-correct; this is only the repository's entry in the client.
+`fdroid update` clears `repo/icons/` at the start of every run and copies
+`repo_icon` in from the repo root, so the icon lives at `icon.png` next to
+`config.yml`, not in `repo/icons/`. Put it anywhere else and the client shows
+a generated placeholder. `tools/publish.py` copies the launcher icon there
+before every update.

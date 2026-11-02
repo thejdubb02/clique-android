@@ -10,7 +10,7 @@ python3 tools/publish.py
 
 It refuses a dirty git tree, so a published APK always traces to a commit. It also refuses unless `versionCode` in `app/build.gradle.kts` is higher than anything already in the repo. Android will not offer an update for an equal or lower code, and it fails silently.
 
-Then it runs the unit tests and a release build, checks the APK is signed with the release key, copies it into the local F-Droid tree as `dev.useclique.android_<versionCode>.apk`, rebuilds the index (and puts the real launcher icon back after `fdroid update` wipes it), and rsyncs `repo/` and `archive/` to vps1.
+Then it runs the unit tests and a release build, checks the APK is signed with the release key, copies it into the local F-Droid tree as `dev.useclique.android_<versionCode>.apk`, rebuilds the index with the launcher icon as the repository icon, and rsyncs `repo/` and `archive/` to vps1.
 
 ## Why the signature check exists
 

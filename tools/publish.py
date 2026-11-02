@@ -27,7 +27,8 @@ ICON_SRC = ROOT / "app" / "src" / "main" / "res" / "mipmap-xxhdpi" / "ic_launche
 
 FDROID = Path("/root/.clique-android/fdroid")
 INDEX = FDROID / "repo" / "index-v2.json"
-ICON_DST = FDROID / "repo" / "icons" / "icon.png"
+# fdroid update wipes repo/icons/ and copies repo_icon in from the repo root.
+ICON_DST = FDROID / "icon.png"
 FDROID_BIN = Path("/root/.cache/clique-fdroid/bin/fdroid")
 
 ANDROID_HOME = "/opt/android-sdk"
@@ -305,13 +306,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.dry_run:
         shutil.copy2(APK_BUILT, dest_apk)
         print(f"copied {dest_apk.name}", flush=True)
-        fdroid_update()
         if not ICON_SRC.is_file():
             die(
                 f"{ICON_SRC} is missing. The launcher icon has to exist so "
                 f"fdroid update does not generate a placeholder."
             )
-        ICON_DST.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ICON_SRC, ICON_DST)
         fdroid_update()
         publish_repo()
