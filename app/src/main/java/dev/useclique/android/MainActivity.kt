@@ -55,12 +55,19 @@ class MainActivity : AppCompatActivity() {
             val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
             when {
                 serverId != null && sessionId != null && store.get(serverId) != null -> {
+                    // One transaction per screen. A single transaction is one
+                    // back-stack entry, so back undid all three replaces at once
+                    // and left an empty, black container.
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.container, ServersFragment())
-                        .addToBackStack("servers")
+                        .commit()
+                    supportFragmentManager.beginTransaction()
                         .replace(R.id.container, SessionsFragment.newInstance(serverId))
                         .addToBackStack("sessions")
+                        .commit()
+                    supportFragmentManager.beginTransaction()
                         .replace(R.id.container, SessionFragment.newInstance(serverId, sessionId))
+                        .addToBackStack("session")
                         .commit()
                 }
                 serverId != null && store.get(serverId) != null && !store.token(serverId).isNullOrBlank() -> {
